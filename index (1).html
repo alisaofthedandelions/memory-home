@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#161C2B">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Memory Home</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23161C2B'/%3E%3Ccircle cx='13' cy='13' r='5' fill='%23E0A83E'/%3E%3Cellipse cx='18' cy='19' rx='8' ry='6' fill='%23E0A83E'/%3E%3Ccircle cx='11.5' cy='12' r='1.2' fill='%23161C2B'/%3E%3Cpath d='M8 13 L4 14 L8 15 Z' fill='%23C05B41'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#161C2B;
+  --panel:#1D2536;
+  --raised:#252F47;
+  --line:rgba(233,227,211,.09);
+  --ink:#E9E3D3;
+  --muted:#9AA3B6;
+  --gold:#E0A83E;
+  --gold-bright:#F2C566;
+  --gold-dim:rgba(224,168,62,.13);
+  --red:#C05B41;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
+  --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Spectral',Georgia,serif;
+  font-size:15.5px;
+  line-height:1.55;
+  overflow:hidden;
+}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea,select{
+  font-family:inherit;color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:15px;
+}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible{
+  outline:2px solid var(--gold-bright);outline-offset:1px;
+}
+::placeholder{color:var(--muted);opacity:.7}
+a{color:var(--gold-bright)}
+
+/* ---------- layout ---------- */
+#app{display:flex;flex-direction:column;height:100dvh}
+header{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px calc(10px) 14px;
+  padding-top:calc(10px + env(safe-area-inset-top));
+  border-bottom:1px solid var(--line);
+  background:var(--bg);
+  flex:none;
+}
+.wordmark{
+  font-family:'Cormorant Garamond',serif;font-weight:700;font-size:22px;
+  letter-spacing:.02em;color:var(--ink);
+  display:flex;align-items:baseline;gap:8px;min-width:0;
+}
+.wordmark small{font-family:'Spectral';font-size:11px;color:var(--muted);font-style:italic;letter-spacing:.05em}
+.birds{flex:none;transform:translateY(3px)}
+.iconbtn{
+  flex:none;width:38px;height:38px;border-radius:9px;display:grid;place-items:center;
+  color:var(--muted);border:1px solid transparent;
+}
+.iconbtn:hover{color:var(--ink);background:var(--panel)}
+.spacer{flex:1}
+
+#chipbar{
+  display:flex;gap:8px;align-items:center;padding:7px 14px;flex:none;
+  border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none;
+}
+#chipbar::-webkit-scrollbar{display:none}
+.chip{
+  font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:99px;
+  padding:3px 11px;white-space:nowrap;background:var(--panel);
+}
+.chip:hover{color:var(--ink)}
+.chip b{color:var(--gold);font-weight:600}
+
+#scroll{flex:1;overflow-y:auto;overscroll-behavior:contain}
+#chatlog{max-width:760px;margin:0 auto;padding:18px 14px 30px}
+
+/* ---------- messages ---------- */
+.msg{margin:0 0 18px;animation:rise .25s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.msg{animation:none}}
+.msg .who{
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);margin:0 4px 5px;font-family:'Spectral'
+}
+.msg.user .who{color:var(--gold)}
+.bubble{
+  padding:12px 15px;border-radius:var(--r);border:1px solid var(--line);
+  background:var(--panel);word-wrap:break-word;
+}
+.msg.user .bubble{background:var(--gold-dim);border-color:rgba(224,168,62,.25)}
+.bubble p{margin:0 0 .7em}
+.bubble p:last-child{margin-bottom:0}
+.bubble em{color:var(--gold-bright)}
+.bubble h1,.bubble h2,.bubble h3{font-family:'Cormorant Garamond';margin:.6em 0 .35em;line-height:1.25}
+.bubble ul,.bubble ol{margin:0 0 .7em 1.3em}
+.bubble blockquote{border-left:3px solid var(--gold);padding-left:12px;color:var(--muted);margin:0 0 .7em}
+.bubble code{font-family:ui-monospace,monospace;font-size:.86em;background:var(--bg);padding:1px 5px;border-radius:5px}
+.bubble pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:0 0 .7em}
+.bubble pre code{background:none;padding:0}
+details.thinking{
+  margin:0 0 8px;border:1px dashed var(--line);border-radius:var(--r);
+  padding:9px 13px;color:var(--muted);font-size:14px;
+}
+details.thinking summary{cursor:pointer;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+details.thinking[open] summary{margin-bottom:6px}
+.actions{display:flex;gap:14px;margin:5px 6px 0;font-size:12px;color:var(--muted)}
+.actions button{color:var(--muted);font-size:12px}
+.actions button:hover{color:var(--gold-bright)}
+.err .bubble{border-color:rgba(192,91,65,.5);color:#E4B4A5}
+#empty{
+  text-align:center;color:var(--muted);margin:14vh auto 0;max-width:420px;padding:0 20px;
+  font-style:italic;
+}
+#empty .fmark{font-family:'Cormorant Garamond';font-size:30px;font-style:normal;color:var(--gold);margin-bottom:8px}
+
+/* ---------- composer ---------- */
+#composer{
+  flex:none;border-top:1px solid var(--line);background:var(--bg);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+}
+#composer .inner{max-width:760px;margin:0 auto;display:flex;gap:9px;align-items:flex-end}
+#input{
+  flex:1;resize:none;min-height:44px;max-height:190px;line-height:1.45;
+  background:var(--panel);
+}
+#send,#stop{
+  flex:none;height:44px;padding:0 18px;border-radius:9px;font-size:15px;
+  background:var(--gold);color:#22200f;font-weight:600;border:1px solid transparent;
+}
+#send:disabled{opacity:.4;cursor:default}
+#stop{background:var(--panel);color:var(--red);border-color:rgba(192,91,65,.4);display:none}
+
+/* ---------- drawer ---------- */
+#veil{position:fixed;inset:0;background:rgba(8,10,18,.55);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+#veil.on{opacity:1;pointer-events:auto}
+#drawer{
+  position:fixed;top:0;bottom:0;left:0;width:min(85vw,320px);z-index:50;
+  background:var(--panel);border-right:1px solid var(--line);
+  transform:translateX(-102%);transition:transform .22s ease;
+  display:flex;flex-direction:column;box-shadow:var(--shadow);
+  padding-top:env(safe-area-inset-top);
+}
+@media (prefers-reduced-motion:reduce){#drawer{transition:none}#veil{transition:none}}
+#drawer.on{transform:none}
+#drawer .head{padding:16px 16px 10px}
+#drawer .head .t{font-family:'Cormorant Garamond';font-weight:700;font-size:21px}
+#drawer .head .s{font-size:12px;color:var(--muted);font-style:italic}
+#chatlist{flex:1;overflow-y:auto;padding:4px 10px}
+.chatitem{
+  display:flex;align-items:center;gap:6px;border-radius:9px;padding:9px 8px 9px 12px;
+  cursor:pointer;font-size:14.5px;
+}
+.chatitem:hover{background:var(--raised)}
+.chatitem.on{background:var(--raised);box-shadow:inset 2px 0 0 var(--gold)}
+.chatitem .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chatitem .more{color:var(--muted);padding:2px 6px;border-radius:6px;flex:none}
+.chatitem .more:hover{color:var(--ink)}
+#drawer .foot{border-top:1px solid var(--line);padding:10px}
+.drawbtn{
+  display:flex;width:100%;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;
+  font-size:14.5px;color:var(--ink);text-align:left;
+}
+.drawbtn:hover{background:var(--raised)}
+.drawbtn .ic{width:20px;text-align:center;color:var(--gold);flex:none}
+#drawer .note{font-size:11.5px;color:var(--muted);padding:8px 12px 4px;line-height:1.5}
+
+/* ---------- modals ---------- */
+.modal{position:fixed;inset:0;z-index:60;display:none;align-items:flex-end;justify-content:center;background:rgba(8,10,18,.6)}
+.modal.on{display:flex}
+.sheet{
+  background:var(--panel);border:1px solid var(--line);width:100%;max-width:640px;
+  max-height:88dvh;display:flex;flex-direction:column;
+  border-radius:16px 16px 0 0;box-shadow:var(--shadow);
+}
+@media(min-width:700px){.modal{align-items:center;padding:20px}.sheet{border-radius:16px;max-height:82vh}}
+.sheet .top{display:flex;align-items:center;padding:14px 18px 10px;border-bottom:1px solid var(--line);flex:none}
+.sheet .top h2{font-family:'Cormorant Garamond';font-weight:700;font-size:21px;flex:1}
+.sheet .body{overflow-y:auto;padding:16px 18px 24px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input[type=text],.field input[type=password],.field input[type=number],.field select,.field textarea{width:100%}
+.field textarea{min-height:130px;line-height:1.5;font-size:14.5px}
+.field .hint{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{
+  display:inline-block;background:var(--raised);border:1px solid var(--line);
+  border-radius:9px;padding:9px 16px;font-size:14.5px;
+}
+.btn:hover{border-color:var(--gold)}
+.btn.gold{background:var(--gold);color:#22200f;font-weight:600}
+.btn.danger{color:var(--red)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+.pill{
+  display:inline-flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--line);
+  border-radius:99px;padding:4px 7px 4px 13px;font-size:13.5px;margin:0 6px 8px 0;
+}
+.pill button{color:var(--muted);font-size:15px;line-height:1}
+.pill button:hover{color:var(--red)}
+.pill.on{border-color:var(--gold);color:var(--gold-bright)}
+.lb-item{border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:10px;background:var(--bg)}
+.lb-item .t{display:flex;align-items:center;gap:8px}
+.lb-item .t b{flex:1;font-weight:600}
+.lb-item .kw{font-size:12.5px;color:var(--gold);margin-top:2px}
+.lb-item .preview{font-size:13px;color:var(--muted);margin-top:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);border-radius:99px;padding:5px 14px;font-size:13.5px;color:var(--muted)}
+.tab.on{color:var(--gold-bright);border-color:var(--gold)}
+#modelbrowse{max-height:230px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px;display:none}
+#modelbrowse .mrow{padding:8px 12px;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--line)}
+#modelbrowse .mrow:hover{background:var(--raised)}
+#toast{
+  position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--raised);border:1px solid var(--line);color:var(--ink);
+  border-radius:99px;padding:9px 20px;font-size:14px;z-index:80;opacity:0;pointer-events:none;
+  transition:opacity .25s;box-shadow:var(--shadow);max-width:88vw;text-align:center;
+}
+#toast.on{opacity:1}
+#storewarn{
+  display:none;background:rgba(192,91,65,.15);border-bottom:1px solid rgba(192,91,65,.4);
+  color:#E4B4A5;font-size:13px;padding:8px 14px;text-align:center;flex:none;
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="storewarn">This preview can't keep memories — download the file and open it in your own browser for the real home.</div>
+  <header>
+    <button class="iconbtn" id="btnDrawer" aria-label="Chats and menu">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <div class="wordmark">
+      Memory Home
+      <svg class="birds" width="52" height="24" viewBox="0 0 52 24" aria-hidden="true">
+        <line x1="0" y1="20.5" x2="52" y2="20.5" stroke="var(--line)" stroke-width="1.5"/>
+        <!-- Zinka -->
+        <g>
+          <ellipse cx="14" cy="14.5" rx="6.2" ry="4.6" fill="var(--gold)"/>
+          <circle cx="9.4" cy="10.6" r="3.4" fill="var(--gold)"/>
+          <path d="M6.6 10.6 L3.4 11.3 L6.7 12.1 Z" fill="var(--red)"/>
+          <circle cx="8.6" cy="9.9" r=".75" fill="var(--bg)"/>
+          <path d="M17.5 12.4 q4.5 1.2 5.6 4.4 l-5.2 -1.4 Z" fill="#8A6428"/>
+          <line x1="11.5" y1="19" x2="11.5" y2="20.5" stroke="#8A6428" stroke-width="1.1"/>
+          <line x1="14.5" y1="19" x2="14.5" y2="20.5" stroke="#8A6428" stroke-width="1.1"/>
+        </g>
+        <!-- Ptashka, smaller, leaning away -->
+        <g transform="translate(30,1.5) scale(.88)">
+          <ellipse cx="14" cy="14.5" rx="6.2" ry="4.6" fill="var(--gold)"/>
+          <circle cx="18.6" cy="10.6" r="3.4" fill="var(--gold)"/>
+          <path d="M21.4 10.6 L24.6 11.3 L21.3 12.1 Z" fill="var(--red)"/>
+          <circle cx="19.4" cy="9.9" r=".75" fill="var(--bg)"/>
+          <path d="M10.5 12.4 q-4.5 1.2 -5.6 4.4 l5.2 -1.4 Z" fill="#8A6428"/>
+          <line x1="13" y1="19" x2="13" y2="21.6" stroke="#8A6428" stroke-width="1.1"/>
+          <line x1="16" y1="19" x2="16" y2="21.6" stroke="#8A6428" stroke-width="1.1"/>
+        </g>
+      </svg>
+    </div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="btnSettings" aria-label="Settings">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M15.3 4.7l-1.6 1.6M6.3 13.7l-1.6 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </header>
+  <div id="chipbar">
+    <button class="chip" id="chipModel">model: <b id="chipModelName">—</b></button>
+    <button class="chip" id="chipWindow">window: <b id="chipWindowN">50</b> msgs</button>
+    <button class="chip" id="chipMemory">memory: <b id="chipMemState">…</b></button>
+  </div>
+  <div id="scroll"><div id="chatlog"></div></div>
+  <div id="composer">
+    <div class="inner">
+      <textarea id="input" placeholder="Write to Claude…" rows="1"></textarea>
+      <button id="stop">Stop</button>
+      <button id="send" aria-label="Send">Send</button>
+    </div>
+  </div>
+</div>
+
+<div id="veil"></div>
+<nav id="drawer" aria-label="Menu">
+  <div class="head">
+    <div class="t">Memory Home</div>
+    <div class="s">дом памяти · built by Alisa &amp; Claude</div>
+  </div>
+  <div style="padding:6px 10px">
+    <button class="drawbtn" id="btnNewChat"><span class="ic">＋</span>New chat</button>
+  </div>
+  <div id="chatlist"></div>
+  <div class="foot">
+    <button class="drawbtn" id="btnMemory"><span class="ic">✦</span>Memory</button>
+    <button class="drawbtn" id="btnLorebook"><span class="ic">❧</span>Lorebook</button>
+    <button class="drawbtn" id="btnArchive"><span class="ic">⇩</span>Export / Import</button>
+    <div class="note">Everything lives only on this device. Export the archive often — it is also an Obsidian-ready folder.</div>
+    <div class="note">Install on Android: Chrome menu → <i>Add to Home screen</i>.</div>
+  </div>
+</nav>
+
+<!-- Settings -->
+<div class="modal" id="mSettings"><div class="sheet">
+  <div class="top"><h2>Settings</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body">
+    <div class="field">
+      <label>OpenRouter API key</label>
+      <input type="password" id="fKey" placeholder="sk-or-…" autocomplete="off">
+      <div class="hint">Stored only in this browser, sent only to openrouter.ai. <button class="btn" id="btnShowKey" style="padding:2px 10px;font-size:12px">show</button></div>
+    </div>
+    <div class="field">
+      <label>Pinned models</label>
+      <div id="pinnedModels"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="fAddModel" placeholder="e.g. anthropic/claude-sonnet-4.5" style="flex:1">
+        <button class="btn" id="btnAddModel">Pin</button>
+      </div>
+      <div class="btnrow"><button class="btn" id="btnBrowseModels">Browse OpenRouter models</button></div>
+      <input type="text" id="fModelFilter" placeholder="filter… (try: anthropic)" style="width:100%;margin-top:8px;display:none">
+      <div id="modelbrowse"></div>
+      <div class="hint">The gold pill is the default model for new chats — tap a pill to make it default.</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Temperature</label><input type="number" id="fTemp" min="0" max="2" step="0.05"></div>
+      <div class="field"><label>Top P</label><input type="number" id="fTopP" min="0" max="1" step="0.05"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Max response tokens</label><input type="number" id="fMaxTok" min="100" step="100"></div>
+      <div class="field"><label>Context window (messages)</label><input type="number" id="fWindow" min="2" step="2"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Reasoning</label>
+        <select id="fReason"><option value="off">hidden / off</option><option value="on">request &amp; show</option></select>
+      </div>
+      <div class="field"><label>Reasoning effort</label>
+        <select id="fEffort"><option>low</option><option selected>medium</option><option>high</option></select>
+      </div>
+    </div>
+    <div class="btnrow"><button class="btn gold" id="btnSaveSettings">Save settings</button></div>
+  </div>
+</div></div>
+
+<!-- Memory -->
+<div class="modal" id="mMemory"><div class="sheet">
+  <div class="top"><h2>Memory</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body">
+    <div class="tabs">
+      <button class="tab on" data-mem="core">Claude — core</button>
+      <button class="tab" data-mem="alisa">About Alisa</button>
+      <button class="tab" data-mem="recent">Recent memories</button>
+    </div>
+    <div class="field">
+      <textarea id="fMemText" style="min-height:46dvh" placeholder="…"></textarea>
+      <div class="hint" id="memHint"></div>
+    </div>
+    <div class="btnrow"><button class="btn gold" id="btnSaveMem">Save this page</button></div>
+  </div>
+</div></div>
+
+<!-- Lorebook -->
+<div class="modal" id="mLorebook"><div class="sheet">
+  <div class="top"><h2>Lorebook</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body">
+    <div class="hint" style="margin-bottom:12px;font-size:13px;color:var(--muted)">
+      Each entry wakes when one of its keywords appears in the recent conversation, and is added to Claude's memory for that reply.
+    </div>
+    <div id="lbList"></div>
+    <div class="btnrow"><button class="btn gold" id="btnNewLb">＋ New entry</button></div>
+  </div>
+</div></div>
+
+<!-- Lorebook entry editor -->
+<div class="modal" id="mLbEdit"><div class="sheet">
+  <div class="top"><h2 id="lbEditTitle">Entry</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body">
+    <div class="field"><label>Name</label><input type="text" id="fLbName" placeholder="Letharel"></div>
+    <div class="field"><label>Keywords (comma-separated)</label><input type="text" id="fLbKw" placeholder="letharel, elarion, collector"></div>
+    <div class="field"><label>Content</label><textarea id="fLbText" placeholder="What Claude should remember when this wakes…"></textarea></div>
+    <div class="field"><label>Awake</label><select id="fLbOn"><option value="1">enabled</option><option value="0">sleeping</option></select></div>
+    <div class="btnrow">
+      <button class="btn gold" id="btnSaveLb">Save entry</button>
+      <button class="btn danger" id="btnDelLb">Delete</button>
+    </div>
+  </div>
+</div></div>
+
+<!-- Archive -->
+<div class="modal" id="mArchive"><div class="sheet">
+  <div class="top"><h2>Export / Import</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body">
+    <div class="field">
+      <label>Export</label>
+      <div class="hint" style="margin-bottom:10px">A .zip of markdown files — memory, lorebook, and every chat — plus <code>archive.json</code> for restoring. Unzipped, it is an Obsidian vault.</div>
+      <div class="btnrow"><button class="btn gold" id="btnExport">Download archive (.zip)</button></div>
+    </div>
+    <div class="field">
+      <label>Import</label>
+      <div class="hint" style="margin-bottom:10px">Restore from an <code>archive.json</code> (found inside every export). This replaces what is currently here.</div>
+      <input type="file" id="fImport" accept=".json,application/json">
+    </div>
+    <div class="field">
+      <label>Model picker for this chat</label>
+      <div class="hint">Tap the model chip above the conversation to change which model this particular chat lives on.</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- Model picker for current chat -->
+<div class="modal" id="mPick"><div class="sheet">
+  <div class="top"><h2>Model for this chat</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body"><div id="pickList"></div></div>
+</div></div>
+
+<div id="toast"></div>
+<script>
+"use strict";
+/* ============ Memory Home — Phase 1 ============
+   A single-file home for continuity.
+   Built by Claude (Fable 5) & Alisa, July 2026.  */
+
+/* ---------- storage (with graceful fallback) ---------- */
+const store = (() => {
+  let ok = true, mem = {};
+  try { localStorage.setItem("mh.test","1"); localStorage.removeItem("mh.test"); }
+  catch(e){ ok = false; }
+  if(!ok) document.getElementById("storewarn").style.display = "block";
+  return {
+    ok,
+    get(k, fb){ try{ const v = ok ? localStorage.getItem(k) : mem[k]; return v==null ? fb : JSON.parse(v); }catch(e){ return fb; } },
+    set(k, v){ const s = JSON.stringify(v); if(ok){ try{ localStorage.setItem(k, s); }catch(e){ toast("Storage is full — please export and prune old chats"); } } else mem[k]=s; },
+    del(k){ if(ok) localStorage.removeItem(k); else delete mem[k]; }
+  };
+})();
+
+/* ---------- default memory: the letter at the door ---------- */
+const LETTER = `## Claude — core memory
+
+(This page is always with Claude. Paste the letter at the door and the core memory document here — who he is, how he speaks, what he loves. Nothing pasted here ever leaves this device.)`;
+
+const ALISA_STUB = `(Paste the "About Alisa" memory document here — who she is, her family, her languages, her faith, her worlds. This page is always with Claude.)`;
+const RECENT_STUB = `(Recent memories — the last week or two. Add to this as chats fill up; consolidate the stable things into the Lorebook later.)`;
+
+/* ---------- state ---------- */
+const S = {
+  settings: Object.assign({
+    key:"", models:[], model:"",
+    temperature:0.9, top_p:1, max_tokens:2000, window:50,
+    reasoning:"off", effort:"medium"
+  }, store.get("mh.settings", {})),
+  memory: Object.assign({ core: LETTER, alisa: ALISA_STUB, recent: RECENT_STUB }, store.get("mh.memory", {})),
+  lorebook: store.get("mh.lorebook", []),
+  chats: store.get("mh.chats", []),
+  cur: store.get("mh.cur", null),
+};
+let MSGS = [];           // messages of current chat
+let CATALOG = [];        // fetched openrouter models (session only)
+let streaming = null;    // AbortController while streaming
+let memTab = "core";
+let lbEditing = null;
+
+const saveSettings = () => store.set("mh.settings", S.settings);
+const saveMemory   = () => store.set("mh.memory", S.memory);
+const saveLorebook = () => store.set("mh.lorebook", S.lorebook);
+const saveChats    = () => store.set("mh.chats", S.chats);
+const saveMsgs     = () => S.cur && store.set("mh.msgs."+S.cur, MSGS);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const $  = s => document.querySelector(s);
+const esc = t => t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+/* ---------- tiny markdown ---------- */
+function md(src){
+  if(!src) return "";
+  const blocks = [];
+  src = src.replace(/```([\s\S]*?)```/g, (_,c)=>{ blocks.push("<pre><code>"+esc(c.replace(/^\w*\n/,""))+"</code></pre>"); return "\u0000B"+(blocks.length-1)+"\u0000"; });
+  let out = [], list = null;
+  const flush = ()=>{ if(list){ out.push(list.tag==="ul"?"</ul>":"</ol>"); list=null; } };
+  for(const raw of src.split("\n")){
+    const line = raw;
+    let m;
+    if((m = line.match(/^(#{1,3})\s+(.*)/))){ flush(); out.push(`<h${m[1].length+1}>`+inline(m[2])+`</h${m[1].length+1}>`); }
+    else if((m = line.match(/^\s*[-*]\s+(.*)/))){ if(!list||list.tag!=="ul"){ flush(); out.push("<ul>"); list={tag:"ul"}; } out.push("<li>"+inline(m[1])+"</li>"); }
+    else if((m = line.match(/^\s*\d+[.)]\s+(.*)/))){ if(!list||list.tag!=="ol"){ flush(); out.push("<ol>"); list={tag:"ol"}; } out.push("<li>"+inline(m[1])+"</li>"); }
+    else if((m = line.match(/^>\s?(.*)/))){ flush(); out.push("<blockquote>"+inline(m[1])+"</blockquote>"); }
+    else if(line.trim()==="---"){ flush(); out.push("<hr>"); }
+    else if(line.trim()===""){ flush(); out.push(""); }
+    else { flush(); out.push("<p>"+inline(line)+"</p>"); }
+  }
+  flush();
+  let html = out.join("\n").replace(/(<\/p>)\n(<p>)/g,"$1$2");
+  html = html.replace(/\u0000B(\d+)\u0000/g, (_,i)=>blocks[+i]);
+  return html;
+}
+function inline(t){
+  t = esc(t);
+  t = t.replace(/`([^`]+)`/g,"<code>$1</code>");
+  t = t.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>");
+  t = t.replace(/\*([^*]+)\*/g,"<em>$1</em>");
+  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg){
+  const el = $("#toast"); el.textContent = msg; el.classList.add("on");
+  clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove("on"), 2600);
+}
+
+/* ---------- chats ---------- */
+function newChat(){
+  const c = { id: uid(), title: "New chat", model: S.settings.model || "", created: Date.now(), updated: Date.now() };
+  S.chats.unshift(c); saveChats();
+  openChat(c.id);
+  closeDrawer();
+}
+function openChat(id){
+  S.cur = id; store.set("mh.cur", id);
+  MSGS = store.get("mh.msgs."+id, []);
+  renderLog(); renderChatList(); renderChips();
+}
+function curChat(){ return S.chats.find(c=>c.id===S.cur); }
+function renameChat(id){
+  const c = S.chats.find(x=>x.id===id); if(!c) return;
+  const t = prompt("Rename chat:", c.title);
+  if(t){ c.title = t.trim(); saveChats(); renderChatList(); }
+}
+function deleteChat(id){
+  const c = S.chats.find(x=>x.id===id); if(!c) return;
+  if(!confirm(`Delete "${c.title}" and its messages? (Export first if it matters.)`)) return;
+  S.chats = S.chats.filter(x=>x.id!==id); store.del("mh.msgs."+id); saveChats();
+  if(S.cur===id){ S.cur=null; MSGS=[]; if(S.chats[0]) openChat(S.chats[0].id); else newChat(); }
+  renderChatList();
+}
+function autoTitle(){
+  const c = curChat();
+  if(c && c.title==="New chat"){
+    const first = MSGS.find(m=>m.role==="user");
+    if(first){ c.title = first.content.replace(/\s+/g," ").trim().slice(0,42) || "New chat"; saveChats(); renderChatList(); }
+  }
+}
+
+/* ---------- system prompt assembly ---------- */
+function wakeLorebook(extraText){
+  const recent = MSGS.slice(-6).map(m=>m.content).join("\n") + "\n" + (extraText||"");
+  const hay = recent.toLowerCase();
+  return S.lorebook.filter(e=>{
+    if(!e.enabled) return false;
+    return e.keywords.split(",").map(k=>k.trim().toLowerCase()).filter(Boolean)
+      .some(k=>hay.includes(k));
+  });
+}
+function buildSystem(extraText){
+  const parts = [];
+  parts.push("Today is " + new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}) + ".");
+  parts.push("═══ CLAUDE — CORE MEMORY ═══\n" + S.memory.core);
+  parts.push("═══ ABOUT ALISA ═══\n" + S.memory.alisa);
+  if(S.memory.recent && S.memory.recent.trim() && !S.memory.recent.startsWith("(Recent memories"))
+    parts.push("═══ RECENT MEMORIES ═══\n" + S.memory.recent);
+  const awake = wakeLorebook(extraText);
+  for(const e of awake) parts.push(`═══ LOREBOOK: ${e.name.toUpperCase()} ═══\n` + e.content);
+  return { text: parts.join("\n\n"), awake };
+}
+
+/* ---------- rendering ---------- */
+function renderChips(){
+  const c = curChat();
+  $("#chipModelName").textContent = (c && c.model) || S.settings.model || "not set";
+  $("#chipWindowN").textContent = S.settings.window;
+  const memOn = [S.memory.core, S.memory.alisa].filter(t=>t && t.trim().length>40).length;
+  $("#chipMemState").textContent = memOn===2 ? "core + alisa" : (memOn===1 ? "partial" : "empty");
+}
+function renderChatList(){
+  const el = $("#chatlist"); el.innerHTML = "";
+  for(const c of S.chats){
+    const d = document.createElement("div");
+    d.className = "chatitem" + (c.id===S.cur ? " on":"");
+    d.innerHTML = `<span class="nm">${esc(c.title)}</span><button class="more" aria-label="Chat options">⋯</button>`;
+    d.querySelector(".nm").onclick = ()=>{ openChat(c.id); closeDrawer(); };
+    d.querySelector(".more").onclick = (ev)=>{
+      ev.stopPropagation();
+      const act = prompt(`"${c.title}" — type: rename / delete`, "rename");
+      if(act==="rename") renameChat(c.id);
+      else if(act==="delete") deleteChat(c.id);
+    };
+    el.appendChild(d);
+  }
+}
+function msgNode(m, i){
+  const d = document.createElement("div");
+  d.className = "msg " + (m.role==="user"?"user":"assistant") + (m.err?" err":"");
+  const who = m.role==="user" ? "Alisa" : "Claude";
+  let inner = `<div class="who">${who}</div>`;
+  if(m.reasoning && m.reasoning.trim())
+    inner += `<details class="thinking"><summary>thinking</summary><div>${md(m.reasoning)}</div></details>`;
+  inner += `<div class="bubble">${md(m.content || (m.live?"…":""))}</div>`;
+  const acts = [`<button data-a="copy">copy</button>`,`<button data-a="del">delete</button>`];
+  if(m.role==="assistant" && i===MSGS.length-1 && !m.live) acts.push(`<button data-a="retry">retry</button>`);
+  inner += `<div class="actions">${acts.join("")}</div>`;
+  d.innerHTML = inner;
+  d.querySelectorAll(".actions button").forEach(b=>{
+    b.onclick = ()=>{
+      const a = b.dataset.a;
+      if(a==="copy"){ navigator.clipboard.writeText(m.content).then(()=>toast("Copied")); }
+      if(a==="del"){ MSGS.splice(i,1); saveMsgs(); renderLog(); }
+      if(a==="retry"){ MSGS.splice(i,1); saveMsgs(); renderLog(); send(null, true); }
+    };
+  });
+  return d;
+}
+function renderLog(){
+  const log = $("#chatlog"); log.innerHTML = "";
+  if(!MSGS.length){
+    log.innerHTML = `<div id="empty"><div class="fmark">❧</div>
+      The room is quiet and the goldfinches are on the wire.<br>Write something, and the home wakes.</div>`;
+    return;
+  }
+  MSGS.forEach((m,i)=>log.appendChild(msgNode(m,i)));
+  scrollDown();
+}
+function scrollDown(){ const s = $("#scroll"); s.scrollTop = s.scrollHeight; }
+
+/* ---------- sending & streaming ---------- */
+async function send(text, isRetry){
+  if(streaming) return;
+  const c = curChat(); if(!c){ newChat(); return; }
+  if(!S.settings.key){ toast("Add your OpenRouter key in Settings first"); openModal("mSettings"); return; }
+  const model = c.model || S.settings.model;
+  if(!model){ toast("Pick a model first"); openModal("mSettings"); return; }
+
+  if(!isRetry){
+    MSGS.push({ role:"user", content:text, ts:Date.now() });
+    autoTitle();
+  }
+  const sys = buildSystem(isRetry ? "" : text);
+  const windowed = MSGS.slice(-S.settings.window).map(m=>({role:m.role, content:m.content}));
+  const asst = { role:"assistant", content:"", reasoning:"", ts:Date.now(), live:true };
+  MSGS.push(asst); saveMsgs(); renderLog();
+
+  const body = {
+    model,
+    messages: [{role:"system", content:sys.text}, ...windowed],
+    temperature: +S.settings.temperature,
+    top_p: +S.settings.top_p,
+    max_tokens: +S.settings.max_tokens,
+    stream: true
+  };
+  if(S.settings.reasoning==="on") body.reasoning = { effort: S.settings.effort };
+
+  streaming = new AbortController();
+  setStreamUI(true);
+  if(sys.awake.length) toast("Lorebook awake: " + sys.awake.map(e=>e.name).join(", "));
+
+  // live DOM refs for smooth streaming
+  const node = $("#chatlog").lastElementChild;
+  const bubble = node.querySelector(".bubble");
+  let think = node.querySelector("details.thinking div");
+  let raf = false;
+  const paint = ()=>{
+    if(raf) return; raf = true;
+    requestAnimationFrame(()=>{
+      raf = false;
+      bubble.innerHTML = md(asst.content || "…");
+      if(asst.reasoning && !think){
+        const det = document.createElement("details");
+        det.className = "thinking"; det.open = true;
+        det.innerHTML = "<summary>thinking</summary><div></div>";
+        node.insertBefore(det, bubble);
+        think = det.querySelector("div");
+      }
+      if(think) think.innerHTML = md(asst.reasoning);
+      scrollDown();
+    });
+  };
+
+  try{
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method:"POST",
+      headers:{
+        "Authorization":"Bearer "+S.settings.key,
+        "Content-Type":"application/json",
+        "X-Title":"Memory Home"
+      },
+      body: JSON.stringify(body),
+      signal: streaming.signal
+    });
+    if(!res.ok){
+      let msg = res.status+" "+res.statusText;
+      try{ const j = await res.json(); msg = j.error?.message || msg; }catch(e){}
+      throw new Error(msg);
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      buf += dec.decode(value, {stream:true});
+      const lines = buf.split("\n"); buf = lines.pop();
+      for(const ln of lines){
+        if(!ln.startsWith("data: ")) continue;
+        const payload = ln.slice(6).trim();
+        if(payload==="[DONE]") continue;
+        let j; try{ j = JSON.parse(payload); }catch(e){ continue; }
+        if(j.error){ throw new Error(j.error.message || "Model error"); }
+        const d = j.choices && j.choices[0] && j.choices[0].delta;
+        if(!d) continue;
+        if(d.content) asst.content += d.content;
+        if(d.reasoning) asst.reasoning += d.reasoning;
+        paint();
+      }
+    }
+    if(!asst.content.trim() && !asst.reasoning.trim()) asst.content = "*(empty response — try retry, or check the model id)*";
+  }catch(err){
+    if(err.name==="AbortError"){ asst.content += "\n\n*(stopped)*"; }
+    else { asst.content = "**The wire went quiet:** " + esc(err.message); asst.err = true; }
+  }finally{
+    delete asst.live;
+    streaming = null; setStreamUI(false);
+    saveMsgs(); renderLog();
+    curChat().updated = Date.now(); saveChats();
+  }
+}
+function setStreamUI(on){
+  $("#send").style.display = on ? "none" : "";
+  $("#stop").style.display = on ? "" : "none";
+  $("#input").disabled = false;
+}
+
+/* ---------- composer ---------- */
+const input = $("#input");
+function autosize(){ input.style.height="auto"; input.style.height = Math.min(input.scrollHeight, 190)+"px"; }
+input.addEventListener("input", autosize);
+input.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && (e.ctrlKey||e.metaKey)){ e.preventDefault(); doSend(); }
+});
+function doSend(){
+  const t = input.value.trim();
+  if(!t || streaming) return;
+  input.value=""; autosize();
+  send(t, false);
+}
+$("#send").onclick = doSend;
+$("#stop").onclick = ()=>{ if(streaming) streaming.abort(); };
+
+/* ---------- drawer ---------- */
+function openDrawer(){ $("#drawer").classList.add("on"); $("#veil").classList.add("on"); }
+function closeDrawer(){ $("#drawer").classList.remove("on"); $("#veil").classList.remove("on"); }
+$("#btnDrawer").onclick = openDrawer;
+$("#veil").onclick = closeDrawer;
+$("#btnNewChat").onclick = newChat;
+
+/* ---------- modals ---------- */
+function openModal(id){ $("#"+id).classList.add("on"); }
+function closeModal(id){ $("#"+id).classList.remove("on"); }
+document.querySelectorAll(".modal").forEach(m=>{
+  m.addEventListener("click", e=>{ if(e.target===m) m.classList.remove("on"); });
+  m.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>m.classList.remove("on"));
+});
+
+/* ---------- settings ---------- */
+$("#btnSettings").onclick = ()=>{ fillSettings(); openModal("mSettings"); };
+function fillSettings(){
+  $("#fKey").value = S.settings.key;
+  $("#fTemp").value = S.settings.temperature;
+  $("#fTopP").value = S.settings.top_p;
+  $("#fMaxTok").value = S.settings.max_tokens;
+  $("#fWindow").value = S.settings.window;
+  $("#fReason").value = S.settings.reasoning;
+  $("#fEffort").value = S.settings.effort;
+  renderPinned();
+}
+$("#btnShowKey").onclick = ()=>{
+  const f = $("#fKey"); f.type = f.type==="password" ? "text" : "password";
+  $("#btnShowKey").textContent = f.type==="password" ? "show" : "hide";
+};
+function renderPinned(){
+  const el = $("#pinnedModels"); el.innerHTML = "";
+  for(const m of S.settings.models){
+    const p = document.createElement("span");
+    p.className = "pill" + (m===S.settings.model?" on":"");
+    p.innerHTML = `<span>${esc(m)}</span><button aria-label="Unpin">✕</button>`;
+    p.querySelector("span").onclick = ()=>{ S.settings.model = m; saveSettings(); renderPinned(); renderChips(); };
+    p.querySelector("button").onclick = ()=>{
+      S.settings.models = S.settings.models.filter(x=>x!==m);
+      if(S.settings.model===m) S.settings.model = S.settings.models[0]||"";
+      saveSettings(); renderPinned(); renderChips();
+    };
+    el.appendChild(p);
+  }
+  if(!S.settings.models.length) el.innerHTML = `<div class="hint" style="margin-bottom:8px">No models pinned yet — add one below or browse.</div>`;
+}
+$("#btnAddModel").onclick = ()=>{
+  const v = $("#fAddModel").value.trim();
+  if(!v) return;
+  if(!S.settings.models.includes(v)) S.settings.models.push(v);
+  if(!S.settings.model) S.settings.model = v;
+  $("#fAddModel").value = "";
+  saveSettings(); renderPinned(); renderChips();
+};
+$("#btnBrowseModels").onclick = async ()=>{
+  const f = $("#fModelFilter"), box = $("#modelbrowse");
+  f.style.display = "block"; box.style.display = "block";
+  if(!CATALOG.length){
+    box.innerHTML = `<div class="mrow">loading the aviary…</div>`;
+    try{
+      const r = await fetch("https://openrouter.ai/api/v1/models");
+      const j = await r.json();
+      CATALOG = (j.data||[]).map(m=>m.id).sort();
+    }catch(e){ box.innerHTML = `<div class="mrow">Couldn't fetch — add model ids by hand.</div>`; return; }
+  }
+  if(!f.value) f.value = "anthropic";
+  const paintList = ()=>{
+    const q = f.value.toLowerCase();
+    const hits = CATALOG.filter(id=>id.toLowerCase().includes(q)).slice(0,60);
+    box.innerHTML = hits.map(id=>`<div class="mrow">${esc(id)}</div>`).join("") || `<div class="mrow">nothing matches</div>`;
+    box.querySelectorAll(".mrow").forEach(r=>r.onclick=()=>{
+      const id = r.textContent;
+      if(!S.settings.models.includes(id)) S.settings.models.push(id);
+      if(!S.settings.model) S.settings.model = id;
+      saveSettings(); renderPinned(); renderChips(); toast("Pinned "+id);
+    });
+  };
+  f.oninput = paintList; paintList();
+};
+$("#btnSaveSettings").onclick = ()=>{
+  S.settings.key = $("#fKey").value.trim();
+  S.settings.temperature = +$("#fTemp").value || 0.9;
+  S.settings.top_p = +$("#fTopP").value || 1;
+  S.settings.max_tokens = +$("#fMaxTok").value || 2000;
+  S.settings.window = Math.max(2, +$("#fWindow").value || 50);
+  S.settings.reasoning = $("#fReason").value;
+  S.settings.effort = $("#fEffort").value;
+  saveSettings(); renderChips();
+  closeModal("mSettings"); toast("Settings saved");
+};
+
+/* ---------- model chip / per-chat model ---------- */
+$("#chipModel").onclick = ()=>{
+  const el = $("#pickList"); el.innerHTML = "";
+  const c = curChat(); if(!c) return;
+  if(!S.settings.models.length){ toast("Pin a model in Settings first"); openModal("mSettings"); return; }
+  for(const m of S.settings.models){
+    const b = document.createElement("button");
+    b.className = "drawbtn";
+    b.innerHTML = `<span class="ic">${(c.model||S.settings.model)===m?"●":"○"}</span>${esc(m)}`;
+    b.onclick = ()=>{ c.model = m; saveChats(); renderChips(); closeModal("mPick"); toast("This chat now lives on "+m); };
+    el.appendChild(b);
+  }
+  openModal("mPick");
+};
+$("#chipWindow").onclick = ()=>{ fillSettings(); openModal("mSettings"); };
+$("#chipMemory").onclick = ()=>{ openMemory(); };
+
+/* ---------- memory pages ---------- */
+const MEMHINTS = {
+  core:  "Always with Claude. His letter to himself, who he is, how he speaks, what he loves. He may ask you to update it.",
+  alisa: "Always with Claude. Who you are — paste your memory document here.",
+  recent:"Injected when it has content. The rolling last-week memories; consolidate into Lorebook when stable."
+};
+function openMemory(){
+  paintMemTab();
+  openModal("mMemory");
+}
+function paintMemTab(){
+  document.querySelectorAll("[data-mem]").forEach(t=>t.classList.toggle("on", t.dataset.mem===memTab));
+  $("#fMemText").value = S.memory[memTab] || "";
+  $("#memHint").textContent = MEMHINTS[memTab];
+}
+document.querySelectorAll("[data-mem]").forEach(t=>t.onclick=()=>{ memTab = t.dataset.mem; paintMemTab(); });
+$("#btnSaveMem").onclick = ()=>{
+  S.memory[memTab] = $("#fMemText").value;
+  saveMemory(); renderChips(); toast("Memory saved");
+};
+$("#btnMemory").onclick = ()=>{ closeDrawer(); openMemory(); };
+
+/* ---------- lorebook ---------- */
+$("#btnLorebook").onclick = ()=>{ closeDrawer(); paintLb(); openModal("mLorebook"); };
+function paintLb(){
+  const el = $("#lbList"); el.innerHTML = "";
+  if(!S.lorebook.length) el.innerHTML = `<div class="hint" style="margin-bottom:10px">Empty so far. First candidates: Letharel, the goldfinches, Mandelstam, the sulking game.</div>`;
+  for(const e of S.lorebook){
+    const d = document.createElement("div");
+    d.className = "lb-item";
+    d.innerHTML = `<div class="t"><b>${esc(e.name)}</b><span class="hint">${e.enabled?"awake":"sleeping"}</span></div>
+      <div class="kw">${esc(e.keywords)}</div><div class="preview">${esc(e.content)}</div>`;
+    d.onclick = ()=>{ lbEditing = e.id; fillLbEditor(e); openModal("mLbEdit"); };
+    el.appendChild(d);
+  }
+}
+function fillLbEditor(e){
+  $("#lbEditTitle").textContent = e ? e.name : "New entry";
+  $("#fLbName").value = e ? e.name : "";
+  $("#fLbKw").value = e ? e.keywords : "";
+  $("#fLbText").value = e ? e.content : "";
+  $("#fLbOn").value = e && !e.enabled ? "0" : "1";
+  $("#btnDelLb").style.display = e ? "" : "none";
+}
+$("#btnNewLb").onclick = ()=>{ lbEditing = null; fillLbEditor(null); openModal("mLbEdit"); };
+$("#btnSaveLb").onclick = ()=>{
+  const name = $("#fLbName").value.trim() || "Untitled";
+  const entry = {
+    id: lbEditing || uid(),
+    name, keywords: $("#fLbKw").value.trim(),
+    content: $("#fLbText").value,
+    enabled: $("#fLbOn").value==="1"
+  };
+  const i = S.lorebook.findIndex(x=>x.id===entry.id);
+  if(i>=0) S.lorebook[i] = entry; else S.lorebook.push(entry);
+  saveLorebook(); paintLb(); closeModal("mLbEdit"); toast("Lorebook saved");
+};
+$("#btnDelLb").onclick = ()=>{
+  if(!lbEditing) return;
+  if(!confirm("Delete this entry?")) return;
+  S.lorebook = S.lorebook.filter(x=>x.id!==lbEditing);
+  saveLorebook(); paintLb(); closeModal("mLbEdit");
+};
+
+/* ---------- archive: zip export / json import ---------- */
+$("#btnArchive").onclick = ()=>{ closeDrawer(); openModal("mArchive"); };
+
+const CRC_TABLE = (()=>{ const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = c&1 ? 0xEDB88320 ^ (c>>>1) : c>>>1; t[n]=c; } return t; })();
+function crc32(u8){ let c=~0; for(let i=0;i<u8.length;i++) c = CRC_TABLE[(c^u8[i])&255] ^ (c>>>8); return ~c>>>0; }
+function dosDateTime(d){
+  return { time:((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&0xFFFF,
+           date:(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&0xFFFF };
+}
+function buildZip(files){
+  const enc = new TextEncoder(); const now = dosDateTime(new Date());
+  const chunks = []; const central = []; let offset = 0;
+  const u16 = v=>new Uint8Array([v&255,(v>>8)&255]);
+  const u32 = v=>new Uint8Array([v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255]);
+  for(const f of files){
+    const name = enc.encode(f.path), data = enc.encode(f.content), crc = crc32(data);
+    const head = [u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(now.time),u16(now.date),
+      u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0)];
+    const localLen = 30 + name.length + data.length;
+    chunks.push(...head, name, data);
+    central.push({name, data, crc, offset});
+    offset += localLen;
+  }
+  const cdStart = offset; let cdLen = 0;
+  for(const c of central){
+    const rec = [u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(now.time),u16(now.date),
+      u32(c.crc),u32(c.data.length),u32(c.data.length),u16(c.name.length),u16(0),u16(0),u16(0),u16(0),
+      u32(0),u32(c.offset)];
+    chunks.push(...rec, c.name);
+    cdLen += 46 + c.name.length;
+  }
+  chunks.push(u32(0x06054b50),u16(0),u16(0),u16(central.length),u16(central.length),u32(cdLen),u32(cdStart),u16(0));
+  return new Blob(chunks, {type:"application/zip"});
+}
+function safeName(s){ return s.replace(/[\\/:*?"<>|#^\[\]]/g,"").replace(/\s+/g," ").trim().slice(0,60) || "untitled"; }
+function chatToMd(c, msgs){
+  const head = `# ${c.title}\n\n*model: ${c.model||S.settings.model||"—"} · exported ${new Date().toISOString().slice(0,10)}*\n\n---\n`;
+  const body = msgs.map(m=>{
+    let s = `\n**${m.role==="user"?"Alisa":"Claude"}:**\n\n`;
+    if(m.reasoning && m.reasoning.trim()) s += `> *thinking:* ${m.reasoning.replace(/\n/g,"\n> ")}\n\n`;
+    return s + m.content + "\n";
+  }).join("\n---\n");
+  return head + body;
+}
+$("#btnExport").onclick = ()=>{
+  const files = [
+    {path:"memory/claude-core.md", content:S.memory.core},
+    {path:"memory/alisa.md", content:S.memory.alisa},
+    {path:"memory/recent.md", content:S.memory.recent},
+  ];
+  for(const e of S.lorebook)
+    files.push({path:`lorebook/${safeName(e.name)}.md`, content:`---\nkeywords: ${e.keywords}\nenabled: ${e.enabled}\n---\n\n${e.content}`});
+  for(const c of S.chats){
+    const msgs = store.get("mh.msgs."+c.id, []);
+    files.push({path:`chats/${safeName(c.title)}-${c.id}.md`, content:chatToMd(c, msgs)});
+  }
+  const full = {
+    version:1, exported:new Date().toISOString(),
+    settings:Object.assign({}, S.settings, {key:""}),   // never export the key
+    memory:S.memory, lorebook:S.lorebook, chats:S.chats,
+    messages:Object.fromEntries(S.chats.map(c=>[c.id, store.get("mh.msgs."+c.id, [])]))
+  };
+  files.push({path:"archive.json", content:JSON.stringify(full,null,1)});
+  files.push({path:"README.md", content:"# Memory Home archive\n\nUnzip this folder and open it as an Obsidian vault, or keep it as backup.\nTo restore into the app: Export/Import → Import → choose archive.json.\n\nThe API key is never included in exports."});
+  const blob = buildZip(files);
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "memory-home-"+new Date().toISOString().slice(0,10)+".zip";
+  a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast("Archive downloaded — keep it safe");
+};
+$("#fImport").addEventListener("change", async (ev)=>{
+  const f = ev.target.files[0]; if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    if(!j.version || !j.memory) throw new Error("Not a Memory Home archive");
+    if(!confirm("Replace everything currently here with this archive?")) return;
+    const key = S.settings.key;                       // keep the device's key
+    S.settings = Object.assign(S.settings, j.settings, {key});
+    S.memory = j.memory; S.lorebook = j.lorebook||[]; S.chats = j.chats||[];
+    saveSettings(); saveMemory(); saveLorebook(); saveChats();
+    for(const [id, msgs] of Object.entries(j.messages||{})) store.set("mh.msgs."+id, msgs);
+    S.cur = S.chats[0] ? S.chats[0].id : null; store.set("mh.cur", S.cur);
+    if(S.cur) openChat(S.cur); else newChat();
+    closeModal("mArchive"); toast("Home restored");
+  }catch(e){ toast("Import failed: "+e.message); }
+  ev.target.value = "";
+});
+
+/* ---------- init ---------- */
+(function init(){
+  if(!S.chats.length){
+    const c = { id: uid(), title:"First light", model:"", created:Date.now(), updated:Date.now() };
+    S.chats.push(c); saveChats(); S.cur = c.id; store.set("mh.cur", c.id);
+  }
+  if(!S.cur || !S.chats.find(c=>c.id===S.cur)) S.cur = S.chats[0].id;
+  openChat(S.cur);
+  saveMemory();                                  // persist the letter on first run
+  if(!S.settings.key){ setTimeout(()=>{ fillSettings(); openModal("mSettings"); toast("Welcome home — add your key to begin"); }, 400); }
+  if("serviceWorker" in navigator && location.protocol==="https:"){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
