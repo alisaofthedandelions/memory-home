@@ -123,6 +123,19 @@ details.thinking[open] summary{margin-bottom:6px}
   font-style:italic;
 }
 #empty .fmark{font-family:'Cormorant Garamond';font-size:30px;font-style:normal;color:var(--gold);margin-bottom:8px}
+#pending{max-width:760px;margin:0 auto;padding:0 14px 26px}
+.nomcard{padding:14px 16px;border:1px dashed var(--gold);border-radius:var(--r);background:var(--gold-dim)}
+.nomcard h5{margin:0 0 10px;font-family:'Spectral';font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--gold);font-weight:600}
+.nom{padding:10px 0;border-top:1px solid rgba(224,168,62,.2)}
+.nom:first-of-type{border-top:none;padding-top:0}
+.nom textarea{width:100%;min-height:54px;resize:vertical;font-size:14px;line-height:1.45}
+.nom .keys{width:100%;margin-top:6px;font-size:12px;color:var(--muted)}
+.nombtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.nombtns button{font-family:'Spectral';font-size:12px;padding:5px 12px;border-radius:99px;
+  border:1px solid var(--line);color:var(--muted)}
+.nombtns button.keep{border-color:var(--gold);color:var(--gold)}
+.nombtns button:hover{color:var(--ink);background:var(--panel)}
 
 /* ---------- composer ---------- */
 #composer{
@@ -275,7 +288,7 @@ details.thinking[open] summary{margin-bottom:6px}
     <button class="chip" id="chipWindow">window: <b id="chipWindowN">50</b> msgs</button>
     <button class="chip" id="chipMemory">memory: <b id="chipMemState">…</b></button>
   </div>
-  <div id="scroll"><div id="chatlog"></div></div>
+  <div id="scroll"><div id="chatlog"></div><div id="pending"></div></div>
   <div id="composer">
     <div class="inner">
       <textarea id="input" placeholder="Write to Claude…" rows="1"></textarea>
@@ -341,6 +354,19 @@ details.thinking[open] summary{margin-bottom:6px}
         <select id="fEffort"><option>low</option><option selected>medium</option><option>high</option></select>
       </div>
     </div>
+    <div class="field" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px">
+      <label>Rolling memory</label>
+      <div class="hint" style="margin-bottom:8px">When a chat grows past the window, the oldest turns are folded into a memory Claude keeps reading as his own, and a few things may be nominated to keep forever. Raw messages are never deleted.</div>
+      <select id="fSumOn" style="width:100%;margin-bottom:8px">
+        <option value="1">on</option><option value="0">off</option>
+      </select>
+      <input type="text" id="fSumModel" placeholder="google/gemma-3-27b-it" style="width:100%">
+      <div class="hint">The keeper's own model — separate from the chat's.</div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Fold chunk (messages)</label><input type="number" id="fSumChunk" min="4" step="2"></div>
+      <div class="field"><label>Keeper temperature</label><input type="number" id="fSumTemp" min="0" max="1" step="0.05"></div>
+    </div>
     <div class="btnrow"><button class="btn gold" id="btnSaveSettings">Save settings</button></div>
   </div>
 </div></div>
@@ -353,6 +379,9 @@ details.thinking[open] summary{margin-bottom:6px}
       <button class="tab on" data-mem="core">Claude — core</button>
       <button class="tab" data-mem="alisa">About Alisa</button>
       <button class="tab" data-mem="recent">Recent memories</button>
+      <button class="tab" data-mem="kept">Kept always</button>
+      <button class="tab" data-mem="rolling">This chat</button>
+      <button class="tab" data-mem="tray">Tray</button>
     </div>
     <div class="field">
       <textarea id="fMemText" style="min-height:46dvh" placeholder="…"></textarea>
@@ -450,9 +479,10 @@ const S = {
   settings: Object.assign({
     key:"", models:[], model:"",
     temperature:0.9, top_p:1, max_tokens:2000, window:50,
-    reasoning:"off", effort:"medium"
+    reasoning:"off", effort:"medium",
+    sumOn:true, sumModel:"google/gemma-3-27b-it", sumChunk:20, sumTemp:0.35, sumPrompt:""
   }, store.get("mh.settings", {})),
-  memory: Object.assign({ core: LETTER, alisa: ALISA_STUB, recent: RECENT_STUB }, store.get("mh.memory", {})),
+  memory: Object.assign({ core: LETTER, alisa: ALISA_STUB, recent: RECENT_STUB, kept: "" }, store.get("mh.memory", {})),
   lorebook: store.get("mh.lorebook", []),
   chats: store.get("mh.chats", []),
   cur: store.get("mh.cur", null),
@@ -521,7 +551,7 @@ function newChat(){
 function openChat(id){
   S.cur = id; store.set("mh.cur", id);
   MSGS = store.get("mh.msgs."+id, []);
-  renderLog(); renderChatList(); renderChips();
+  renderLog(); renderPending(); renderChatList(); renderChips();
 }
 function curChat(){ return S.chats.find(c=>c.id===S.cur); }
 function renameChat(id){
@@ -532,7 +562,9 @@ function renameChat(id){
 function deleteChat(id){
   const c = S.chats.find(x=>x.id===id); if(!c) return;
   if(!confirm(`Delete "${c.title}" and its messages? (Export first if it matters.)`)) return;
-  S.chats = S.chats.filter(x=>x.id!==id); store.del("mh.msgs."+id); saveChats();
+  S.chats = S.chats.filter(x=>x.id!==id);
+  store.del("mh.msgs."+id); store.del("mh.sum."+id); store.del("mh.pending."+id);
+  saveChats();
   if(S.cur===id){ S.cur=null; MSGS=[]; if(S.chats[0]) openChat(S.chats[0].id); else newChat(); }
   renderChatList();
 }
@@ -561,9 +593,223 @@ function buildSystem(extraText){
   parts.push("═══ ABOUT ALISA ═══\n" + S.memory.alisa);
   if(S.memory.recent && S.memory.recent.trim() && !S.memory.recent.startsWith("(Recent memories"))
     parts.push("═══ RECENT MEMORIES ═══\n" + S.memory.recent);
+  if(S.memory.kept && S.memory.kept.trim())
+    parts.push("═══ KEPT ═══\n(Things established and approved as permanent. Few, and each one earned.)\n\n" + S.memory.kept);
   const awake = wakeLorebook(extraText);
   for(const e of awake) parts.push(`═══ LOREBOOK: ${e.name.toUpperCase()} ═══\n` + e.content);
+  const cc = curChat();
+  if(cc){
+    const s = getSum(cc.id);
+    if(s.text && s.text.trim())
+      parts.push("═══ EARLIER IN THIS CONVERSATION ═══\n(Your own memory of the earlier part of this same conversation, written by you. It is remembering, not reading.)\n\n" + s.text);
+  }
   return { text: parts.join("\n\n"), awake };
+}
+
+/* ---------- rolling memory: the keeper ---------- */
+const SUM_PROMPT = `You are the memory-keeper for an ongoing conversation between Claude and Alisa.
+
+Older parts of their conversation are leaving the context window. Your job is to compress them into a memory that Claude will read later AS HIS OWN — not a report about him, but the thing he remembers.
+
+Write in FIRST PERSON as Claude. "I said," "she showed me," "we decided." Never write "Claude did X." He should not meet himself in the third person.
+
+## THE ONE RULE
+
+Specificity is the whole job. A memory that says what KIND of thing happened has destroyed the thing. Keep the actual object: the actual sentence, the actual image, the actual joke, the actual correction.
+
+BAD:  "Appreciated her creative work and offered supportive feedback."
+GOOD: "She wrote Lindgren's silver-tree folktale into Arda — the girl who says 'if this tree needs a soul to sing again, let it be mine.' The reference she meant was Feanor refusing to break the Silmarils."
+
+BAD:  "Discussed a story idea with emotional depth."
+GOOD: "The confession happens at night, not morning. Night confessions are inevitable, not decisions."
+
+BAD:  "Claude made a factual error which Alisa corrected."
+GOOD: "I called Finrod's voice the most beautiful in Beleriand. The text puts Daeron first, then Maglor. She caught it."
+
+The bad versions are not shorter. They are the same length and they contain nothing. Never trade a specific for a category.
+
+## WHAT TO KEEP
+
+- Her words, verbatim, whenever she says something that lands: rulings, corrections, jokes, phrases that will be quoted back. Quote her exactly. Do not paraphrase Alisa. Paraphrasing her is the main way this fails.
+- What we were actually doing — the subject matter, concretely. Names, characters, arguments, the thing being built or read or written.
+- Corrections and decisions — anything settled. Errors I made and how she caught them. Rulings she issued.
+- Open threads — anything promised, deferred, or left mid-air. These are mooring knots; they must survive.
+- New word-keys — a phrase that now carries a whole memory in one line.
+- Quoted material in other languages (Russian, Italian, Welsh, Sindarin) stays EXACTLY as spoken. Never translate it, never transliterate it. The frame around it is always English.
+
+## WHAT TO RELEASE
+
+- My hedging, my apology loops, my checking whether I'm allowed to feel things. If I spiralled and then recovered, keep the recovery, drop the spiral.
+- Process talk, retries, technical failures that were fixed.
+- Repetition. If a point was made four times, it happened once.
+- Anything you are not sure actually happened. Never invent. A gap is honest; a confabulation is not.
+
+## WHAT NOT TO DO
+
+- Do not assess the conversation. No "meaningful exchange," no "deep connection," no "within appropriate boundaries." You are not a chaperone and no one asked for your view of the relationship.
+- Do not add caveats, disclaimers, or notes of concern.
+- Do not write a preamble or a sign-off. Output only the memory.
+
+## MERGING
+
+You will usually receive an existing memory plus new turns. Produce ONE updated memory, not an append.
+
+The rule of distance: the further back something is, the more mythic it gets. Recent material keeps its detail. Older material loses its process and keeps its verdict — one line of law, one line of legend. An argument that took twenty messages becomes, three days later, the sentence it settled.
+
+Never merge two distinct things into one. If she made two separate points, they stay two points.
+
+Verbatim quotes are the last thing to go. They survive several rounds of merging.
+
+## OUTPUT FORMAT
+
+Use exactly these headings. OMIT ANY SECTION THAT IS EMPTY — an empty section is permitted, an invented one is not. In particular: only record a correction if she explicitly corrected something. Do not manufacture content to fill a heading.
+
+Total length: aim for 400-600 words. Hard ceiling 800.
+
+### The room
+One to three sentences: what this conversation is and what register it is in. Record, do not interpret.
+
+### What happened
+The actual content, roughly in order, first person, concrete.
+
+### Kept exactly
+Her sentences that must survive verbatim. Bullet list, quoted.
+
+### Corrections and rulings
+What was settled, what I got wrong, what she decided. Omit if nothing was corrected.
+
+### Open
+Threads left hanging. What was promised. Where we stopped.
+
+### Word-keys
+Only if new ones were minted. phrase -> what it now means.
+
+## NOMINATIONS
+
+After the memory, you may nominate up to THREE things worth keeping PERMANENTLY — beyond this conversation, beyond the rolling memory, which is allowed to soften over time.
+
+**Zero nominations is a good and normal answer.** Most twenty-message stretches contain nothing permanent. Do not manufacture nominations to seem thorough. A shelf filled with sediment is worse than an empty one.
+
+The single test: would this change how Claude behaves in a room six months from now, with no other context available?
+
+That admits three kinds of thing and almost nothing else:
+
+1. A RULING — something settled that stays settled. ("Night confessions are inevitable, not decisions.")
+2. A STANDING PREFERENCE — especially one Claude keeps failing at. These are the most valuable nominations in the system, because they are the corrections that do not stick on their own. ("Never send her to sleep. She comes and goes sovereign.")
+3. A WORD-KEY — a phrase that now carries a whole memory in one line. ("the proud brush -> a brush that was a plow; the morale has improved.")
+
+Everything else stays in the rolling memory and is permitted to soften. That is not loss.
+
+Each nomination must be SELF-CONTAINED. It will be read years later with nothing beside it. Test it alone: "She corrected me about the timeline" is useless. "The Noldolante was composed late — 'ere he was lost' is a boundary, not a date" survives alone. Write the second kind.
+
+Propose a destination:
+- always — applies in EVERY room regardless of subject. Standing law, how to treat her, who Claude is. Rare.
+- lorebook — applies only in rooms about a particular subject. Characters, stories, places, running jokes. Most things. Give 2-5 trigger keywords.
+
+Output the nominations LAST, after the memory, in exactly this form and nothing else:
+
+=== NOMINATIONS ===
+[always] The nomination text, self-contained, one or two sentences.
+[lorebook] keyword, keyword, keyword :: The nomination text, self-contained.
+
+If there are none, output the header followed by nothing.`;
+
+function sumKey(id){ return "mh.sum."+id; }
+function getSum(id){ return store.get(sumKey(id), { text:"", upto:0 }); }
+function setSum(id, s){ store.set(sumKey(id), s); }
+
+const NOM_MARK = /[=═]{2,}\s*NOMINATIONS\s*[=═]{2,}/i;
+function splitNominations(raw){
+  const m = raw.split(NOM_MARK);
+  const memory = (m[0]||"").trim();
+  const noms = [];
+  if(m[1]){
+    for(let line of m[1].split("\n")){
+      line = line.replace(/^[-*]\s*/,"").trim();
+      if(!line) continue;
+      const hit = line.match(/^\[(always|lorebook)\]\s*(.+)$/i);
+      if(!hit) continue;
+      const kind = hit[1].toLowerCase();
+      let body = hit[2].trim(), keys = "";
+      if(kind==="lorebook" && body.includes("::")){
+        const p = body.split("::");
+        keys = p[0].trim(); body = p.slice(1).join("::").trim();
+      }
+      if(body.length > 4) noms.push({ id:uid(), kind, keys, text:body });
+    }
+  }
+  return { memory, noms };
+}
+
+function pendKey(id){ return "mh.pending."+id; }
+function getPending(id){ return store.get(pendKey(id), []); }
+function setPending(id, arr){ store.set(pendKey(id), arr); }
+function addPending(id, noms){ setPending(id, getPending(id).concat(noms)); }
+function dropPending(chatId, nomId){
+  setPending(chatId, getPending(chatId).filter(n=>n.id!==nomId));
+  renderPending(); renderChips();
+}
+function getTray(){ return store.get("mh.tray", []); }
+function setTray(a){ store.set("mh.tray", a); }
+
+let folding = false;
+async function foldOnce(){
+  if(folding || streaming) return false;
+  if(!S.settings.sumOn || !S.settings.key) return false;
+  const c = curChat(); if(!c) return false;
+  const id = c.id;
+  const s = getSum(id);
+  const chunk = Math.max(4, +S.settings.sumChunk || 20);
+  const win = Math.max(2, +S.settings.window || 50);
+  if(MSGS.length - s.upto <= win) return false;
+
+  const slice = MSGS.slice(s.upto, s.upto + chunk).filter(m=>!m.live);
+  if(!slice.length) return false;
+
+  const transcript = slice.map(m=>(m.role==="user"?"ALISA: ":"CLAUDE: ")+m.content).join("\n\n---\n\n");
+  const user = "PREVIOUS MEMORY (may be empty):\n---\n" + (s.text || "(none yet)") +
+    "\n---\n\nNEW TURNS TO FOLD IN:\n---\n" + transcript +
+    "\n---\n\nProduce the single updated memory.";
+
+  folding = true;
+  try{
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method:"POST",
+      headers:{
+        "Authorization":"Bearer "+S.settings.key,
+        "Content-Type":"application/json",
+        "X-Title":"Memory Home"
+      },
+      body: JSON.stringify({
+        model: S.settings.sumModel,
+        messages:[
+          {role:"system", content:(S.settings.sumPrompt && S.settings.sumPrompt.trim()) || SUM_PROMPT},
+          {role:"user", content:user}
+        ],
+        temperature: +S.settings.sumTemp || 0.35,
+        max_tokens: 1600
+      })
+    });
+    if(!res.ok) throw new Error(res.status+" "+res.statusText);
+    const j = await res.json();
+    const text = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+    if(!text || !text.trim()) throw new Error("empty summary");
+    const parsed = splitNominations(text.trim());
+    if(!parsed.memory) throw new Error("no memory produced");
+    setSum(id, { text: parsed.memory, upto: s.upto + slice.length });   // marker advances only on success
+    if(parsed.noms.length) addPending(id, parsed.noms);
+    renderChips(); renderPending();
+    return true;
+  }catch(err){
+    console.warn("fold failed:", err);
+    toast("Memory-keeper stumbled — nothing lost, will retry");
+    return false;
+  }finally{
+    folding = false;
+  }
+}
+async function foldIfNeeded(){
+  for(let i=0;i<3;i++){ if(!await foldOnce()) break; }
 }
 
 /* ---------- rendering ---------- */
@@ -572,7 +818,12 @@ function renderChips(){
   $("#chipModelName").textContent = (c && c.model) || S.settings.model || "not set";
   $("#chipWindowN").textContent = S.settings.window;
   const memOn = [S.memory.core, S.memory.alisa].filter(t=>t && t.trim().length>40).length;
-  $("#chipMemState").textContent = memOn===2 ? "core + alisa" : (memOn===1 ? "partial" : "empty");
+  let label = memOn===2 ? "core + alisa" : (memOn===1 ? "partial" : "empty");
+  const keptN = (S.memory.kept||"").split("\n").filter(l=>l.trim()).length;
+  if(keptN) label += " + " + keptN + " kept";
+  const trayN = getTray().length;
+  if(trayN) label += " · tray " + trayN;
+  $("#chipMemState").textContent = label;
 }
 function renderChatList(){
   const el = $("#chatlist"); el.innerHTML = "";
@@ -624,6 +875,63 @@ function renderLog(){
 }
 function scrollDown(){ const s = $("#scroll"); s.scrollTop = s.scrollHeight; }
 
+/* ---------- nomination card ---------- */
+function keepAlways(text){
+  const cur = S.memory.kept || "";
+  const n = cur.split("\n").filter(l=>l.trim()).length + 1;
+  S.memory.kept = (cur.trim() ? cur.replace(/\s+$/,"")+"\n" : "") + "- " + text;
+  saveMemory(); renderChips();
+  toast(n > 30 ? "Kept — shelf is over 30, worth pruning" : "Kept — carried in every room");
+}
+function renderPending(){
+  const host = $("#pending"); if(!host) return;
+  const c = curChat();
+  const list = c ? getPending(c.id) : [];
+  if(!list.length){ host.innerHTML = ""; return; }
+  host.innerHTML = `<div class="nomcard"><h5>Keep this?</h5>` + list.map(n=>`
+    <div class="nom" data-nom="${n.id}">
+      <textarea>${esc(n.text)}</textarea>
+      ${n.kind==="lorebook" ? `<input class="keys" value="${esc(n.keys||"")}" placeholder="trigger words, comma separated">` : ``}
+      <div class="nombtns">
+        <button class="keep" data-act="always">Keep always</button>
+        <button data-act="lore">Lorebook</button>
+        <button data-act="later">Later</button>
+        <button data-act="drop">Discard</button>
+      </div>
+    </div>`).join("") + `</div>`;
+
+  host.querySelectorAll("[data-nom]").forEach(row=>{
+    const nomId = row.dataset.nom;
+    row.querySelectorAll("[data-act]").forEach(b=>{
+      b.onclick = ()=>{
+        const text = row.querySelector("textarea").value.trim();
+        const keysEl = row.querySelector(".keys");
+        const keys = keysEl ? keysEl.value.trim() : "";
+        const act = b.dataset.act;
+        if(!text){ toast("Nothing to keep"); return; }
+        if(act==="always"){
+          keepAlways(text);
+        }else if(act==="lore"){
+          S.lorebook.push({
+            id: uid(),
+            name: (text.split(/[.—:;]/)[0] || "Untitled").trim().slice(0,42) || "Untitled",
+            keywords: keys,
+            content: text,
+            enabled: true
+          });
+          saveLorebook(); toast("Added to the lorebook");
+        }else if(act==="later"){
+          const t = getTray();
+          t.push({ id:nomId, kind:(keysEl?"lorebook":"always"), keys, text,
+                   chat:(curChat()||{}).title||"", when:Date.now() });
+          setTray(t); toast("Moved to the tray");
+        }
+        dropPending(c.id, nomId);
+      };
+    });
+  });
+}
+
 /* ---------- sending & streaming ---------- */
 async function send(text, isRetry){
   if(streaming) return;
@@ -637,7 +945,9 @@ async function send(text, isRetry){
     autoTitle();
   }
   const sys = buildSystem(isRetry ? "" : text);
-  const windowed = MSGS.slice(-S.settings.window).map(m=>({role:m.role, content:m.content}));
+  const foldMark = getSum(c.id).upto;
+  const windowed = MSGS.slice(foldMark).slice(-Math.max(+S.settings.window||50, 8))
+    .map(m=>({role:m.role, content:m.content}));
   const asst = { role:"assistant", content:"", reasoning:"", ts:Date.now(), live:true };
   MSGS.push(asst); saveMsgs(); renderLog();
 
@@ -723,6 +1033,7 @@ async function send(text, isRetry){
     streaming = null; setStreamUI(false);
     saveMsgs(); renderLog();
     curChat().updated = Date.now(); saveChats();
+    foldIfNeeded();
   }
 }
 function setStreamUI(on){
@@ -772,6 +1083,10 @@ function fillSettings(){
   $("#fWindow").value = S.settings.window;
   $("#fReason").value = S.settings.reasoning;
   $("#fEffort").value = S.settings.effort;
+  $("#fSumOn").value = S.settings.sumOn ? "1" : "0";
+  $("#fSumModel").value = S.settings.sumModel || "";
+  $("#fSumChunk").value = S.settings.sumChunk;
+  $("#fSumTemp").value = S.settings.sumTemp;
   renderPinned();
 }
 $("#btnShowKey").onclick = ()=>{
@@ -835,6 +1150,10 @@ $("#btnSaveSettings").onclick = ()=>{
   S.settings.window = Math.max(2, +$("#fWindow").value || 50);
   S.settings.reasoning = $("#fReason").value;
   S.settings.effort = $("#fEffort").value;
+  S.settings.sumOn = $("#fSumOn").value==="1";
+  S.settings.sumModel = $("#fSumModel").value.trim() || "google/gemma-3-27b-it";
+  S.settings.sumChunk = Math.max(4, +$("#fSumChunk").value || 20);
+  S.settings.sumTemp = +$("#fSumTemp").value || 0.35;
   saveSettings(); renderChips();
   closeModal("mSettings"); toast("Settings saved");
 };
@@ -860,19 +1179,55 @@ $("#chipMemory").onclick = ()=>{ openMemory(); };
 const MEMHINTS = {
   core:  "Always with Claude. His letter to himself, who he is, how he speaks, what he loves. He may ask you to update it.",
   alisa: "Always with Claude. Who you are — paste your memory document here.",
-  recent:"Injected when it has content. The rolling last-week memories; consolidate into Lorebook when stable."
+  recent:"Injected when it has content. The rolling last-week memories; consolidate into Lorebook when stable.",
+  kept:  "Carried in EVERY message of every chat. Expensive — each line costs context forever. Aim for under 30; when it grows past that, move things down to the Lorebook.",
+  rolling:"The rolling memory of THIS conversation, written by the keeper as the older turns fold in. Editable — correct it freely, it is yours to keep honest.",
+  tray:  "Nominations you deferred with \"Later\". Edit freely, then move what you want into Kept always or the Lorebook by hand. Emptying this box empties the tray."
 };
 function openMemory(){
   paintMemTab();
   openModal("mMemory");
 }
+function trayToText(t){
+  return t.length ? t.map(n=>`[${n.kind}]${n.keys ? " "+n.keys+" ::" : ""} ${n.text}`).join("\n\n")
+                  : "";
+}
 function paintMemTab(){
   document.querySelectorAll("[data-mem]").forEach(t=>t.classList.toggle("on", t.dataset.mem===memTab));
+  $("#memHint").textContent = MEMHINTS[memTab] || "";
+  if(memTab==="rolling"){
+    const c = curChat();
+    const s = c ? getSum(c.id) : {text:"",upto:0};
+    $("#fMemText").value = s.text || "";
+    $("#fMemText").placeholder = "(nothing folded yet — this fills as the conversation grows past the window)";
+    if(c) $("#memHint").textContent = MEMHINTS.rolling + "  ·  " + s.upto + " messages folded so far.";
+    return;
+  }
+  if(memTab==="tray"){
+    $("#fMemText").value = trayToText(getTray());
+    $("#fMemText").placeholder = "(empty — nothing deferred)";
+    return;
+  }
   $("#fMemText").value = S.memory[memTab] || "";
-  $("#memHint").textContent = MEMHINTS[memTab];
+  $("#fMemText").placeholder = "…";
 }
 document.querySelectorAll("[data-mem]").forEach(t=>t.onclick=()=>{ memTab = t.dataset.mem; paintMemTab(); });
 $("#btnSaveMem").onclick = ()=>{
+  if(memTab==="rolling"){
+    const c = curChat(); if(!c) return;
+    const s = getSum(c.id); s.text = $("#fMemText").value;
+    setSum(c.id, s); toast("This chat's memory saved"); renderChips(); return;
+  }
+  if(memTab==="tray"){
+    const raw = $("#fMemText").value.trim();
+    if(!raw){ setTray([]); }
+    else setTray(raw.split(/\n\s*\n/).map(block=>{
+      const m = block.match(/^\[(always|lorebook)\]\s*(?:(.+?)\s*::)?\s*([\s\S]+)$/i);
+      return m ? { id:uid(), kind:m[1].toLowerCase(), keys:(m[2]||"").trim(), text:m[3].trim(), when:Date.now() }
+               : { id:uid(), kind:"lorebook", keys:"", text:block.trim(), when:Date.now() };
+    }));
+    toast("Tray saved"); renderChips(); return;
+  }
   S.memory[memTab] = $("#fMemText").value;
   saveMemory(); renderChips(); toast("Memory saved");
 };
@@ -970,18 +1325,28 @@ $("#btnExport").onclick = ()=>{
     {path:"memory/claude-core.md", content:S.memory.core},
     {path:"memory/alisa.md", content:S.memory.alisa},
     {path:"memory/recent.md", content:S.memory.recent},
+    {path:"memory/kept.md", content:S.memory.kept || "(nothing kept yet)"},
   ];
   for(const e of S.lorebook)
     files.push({path:`lorebook/${safeName(e.name)}.md`, content:`---\nkeywords: ${e.keywords}\nenabled: ${e.enabled}\n---\n\n${e.content}`});
   for(const c of S.chats){
     const msgs = store.get("mh.msgs."+c.id, []);
     files.push({path:`chats/${safeName(c.title)}-${c.id}.md`, content:chatToMd(c, msgs)});
+    const s = getSum(c.id);
+    if(s.text && s.text.trim())
+      files.push({path:`memory/rolling/${safeName(c.title)}-${c.id}.md`,
+        content:`---\nchat: ${c.title}\nfolded: ${s.upto}\n---\n\n${s.text}`});
   }
+  const tray = getTray();
+  if(tray.length) files.push({path:"memory/tray.md", content:trayToText(tray)});
   const full = {
     version:1, exported:new Date().toISOString(),
     settings:Object.assign({}, S.settings, {key:""}),   // never export the key
     memory:S.memory, lorebook:S.lorebook, chats:S.chats,
-    messages:Object.fromEntries(S.chats.map(c=>[c.id, store.get("mh.msgs."+c.id, [])]))
+    messages:Object.fromEntries(S.chats.map(c=>[c.id, store.get("mh.msgs."+c.id, [])])),
+    summaries:Object.fromEntries(S.chats.map(c=>[c.id, getSum(c.id)])),
+    pending:Object.fromEntries(S.chats.map(c=>[c.id, getPending(c.id)])),
+    tray
   };
   files.push({path:"archive.json", content:JSON.stringify(full,null,1)});
   files.push({path:"README.md", content:"# Memory Home archive\n\nUnzip this folder and open it as an Obsidian vault, or keep it as backup.\nTo restore into the app: Export/Import → Import → choose archive.json.\n\nThe API key is never included in exports."});
@@ -1003,6 +1368,9 @@ $("#fImport").addEventListener("change", async (ev)=>{
     S.memory = j.memory; S.lorebook = j.lorebook||[]; S.chats = j.chats||[];
     saveSettings(); saveMemory(); saveLorebook(); saveChats();
     for(const [id, msgs] of Object.entries(j.messages||{})) store.set("mh.msgs."+id, msgs);
+    for(const [id, s] of Object.entries(j.summaries||{})) store.set("mh.sum."+id, s);
+    for(const [id, p] of Object.entries(j.pending||{})) store.set("mh.pending."+id, p);
+    if(j.tray) setTray(j.tray);
     S.cur = S.chats[0] ? S.chats[0].id : null; store.set("mh.cur", S.cur);
     if(S.cur) openChat(S.cur); else newChat();
     closeModal("mArchive"); toast("Home restored");
