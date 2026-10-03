@@ -1,7 +1,7 @@
 /* Memory Home service worker — makes the app installable and openable offline.
    Network-first for the page itself (so updates arrive), never touches API calls. */
-const CACHE = "memory-home-v1";
-const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
+const CACHE = "memory-home-v2";
+const ASSETS = ["./", "./index.html", "./home-core.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -22,3 +22,4 @@ self.addEventListener("fetch", e => {
     }).catch(() => caches.match(e.request).then(m => m || caches.match("./index.html")))
   );
 });
+

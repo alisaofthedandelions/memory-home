@@ -1,0 +1,7 @@
+{
+  "name": "memory-home",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": { "test": "node --test tests/home-core.test.cjs" },
+  "engines": { "node": ">=22" }
+}

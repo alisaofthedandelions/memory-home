@@ -243,6 +243,21 @@ details.thinking[open] summary{margin-bottom:6px}
   display:none;background:rgba(192,91,65,.15);border-bottom:1px solid rgba(192,91,65,.4);
   color:#E4B4A5;font-size:13px;padding:8px 14px;text-align:center;flex:none;
 }
+/* Project controls inherit the home's existing palette and typography. */
+.projectselect{padding:4px 12px 10px}
+.projectselect label{display:block;font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:5px}
+.projectselect select{width:100%;font-size:14px}
+.project-item{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:10px}
+.project-item.on{border-color:var(--gold)}
+.project-item h3{font-family:'Cormorant Garamond';font-size:21px;margin-bottom:4px}
+.project-item .hint{font-size:12px;color:var(--muted)}
+.projecttoggle{display:flex;align-items:center;gap:9px;font-size:14px;margin-bottom:14px}
+#fProjectPrompt{min-height:35dvh}
+#projectHistory details{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+#projectHistory pre,#promptPreview{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--bg);border-radius:9px;padding:14px;font:13px/1.6 'Spectral',Georgia,serif;color:var(--ink);max-height:52dvh;overflow:auto}
+#projectHistory .btn{margin-top:9px}
+button:disabled{opacity:.45;cursor:default}
+@media(max-width:420px){.wordmark{font-size:20px;gap:5px}.project-item .btnrow .btn{flex:1}.row2{gap:9px}}
 </style>
 </head>
 <body>
@@ -284,6 +299,7 @@ details.thinking[open] summary{margin-bottom:6px}
     </button>
   </header>
   <div id="chipbar">
+    <button class="chip" id="chipProject">project: <b id="chipProjectName">—</b></button>
     <button class="chip" id="chipModel">model: <b id="chipModelName">—</b></button>
     <button class="chip" id="chipWindow">window: <b id="chipWindowN">50</b> msgs</button>
     <button class="chip" id="chipMemory">memory: <b id="chipMemState">…</b></button>
@@ -307,8 +323,10 @@ details.thinking[open] summary{margin-bottom:6px}
   <div style="padding:6px 10px">
     <button class="drawbtn" id="btnNewChat"><span class="ic">＋</span>New chat</button>
   </div>
+  <div class="projectselect"><label for="projectSelect">Project</label><select id="projectSelect"></select></div>
   <div id="chatlist"></div>
   <div class="foot">
+    <button class="drawbtn" id="btnProjects"><span class="ic">▤</span>Projects</button>
     <button class="drawbtn" id="btnMemory"><span class="ic">✦</span>Memory</button>
     <button class="drawbtn" id="btnLorebook"><span class="ic">❧</span>Lorebook</button>
     <button class="drawbtn" id="btnArchive"><span class="ic">⇩</span>Export / Import</button>
@@ -316,6 +334,30 @@ details.thinking[open] summary{margin-bottom:6px}
     <div class="note">Install on Android: Chrome menu → <i>Add to Home screen</i>.</div>
   </div>
 </nav>
+
+<!-- Projects -->
+<div class="modal" id="mProjects"><div class="sheet">
+  <div class="top"><h2>Projects</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body"><div class="hint" style="margin-bottom:14px">Each project has its own prompt, lorebook, and lasting memory. Chats keep separate rolling summaries.</div><div id="projectList"></div><div class="btnrow"><button class="btn gold" id="btnNewProject">＋ New project</button></div></div>
+</div></div>
+<div class="modal" id="mProjectEdit"><div class="sheet">
+  <div class="top"><h2 id="projectEditTitle">Project</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body">
+    <div class="field"><label for="fProjectName">Name</label><input type="text" id="fProjectName" placeholder="Project name"></div>
+    <label class="projecttoggle"><input type="checkbox" id="fProjectOn"> Attach Project Prompt</label>
+    <div class="field"><label for="fProjectPrompt">Project Prompt</label><textarea id="fProjectPrompt" placeholder="Identity, voice, conversation rules, writing style, and project instructions…"></textarea><div class="hint">One prompt shared by every chat in this project. Saving keeps earlier versions in History.</div></div>
+    <div class="btnrow"><button class="btn gold" id="btnSaveProject">Save project</button><button class="btn" id="btnProjectLore">Lorebook</button><button class="btn" id="btnPreviewPrompt">Preview prompt</button></div>
+    <details style="margin-top:18px"><summary>History</summary><div id="projectHistory"></div></details>
+  </div>
+</div></div>
+<div class="modal" id="mPromptPreview"><div class="sheet">
+  <div class="top"><h2>Preview prompt</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body"><div class="hint" id="previewHint"></div><pre id="promptPreview"></pre></div>
+</div></div>
+<div class="modal" id="mMoveChat"><div class="sheet">
+  <div class="top"><h2>Move chat</h2><button class="iconbtn" data-close>✕</button></div>
+  <div class="body"><div class="field"><label for="fMoveProject">Destination project</label><select id="fMoveProject"></select><div class="hint">Moves the complete conversation and its rolling summary. The destination project's prompt, lorebook, and lasting memory will apply.</div></div><button class="btn gold" id="btnMoveChat">Move chat</button></div>
+</div></div>
 
 <!-- Settings -->
 <div class="modal" id="mSettings"><div class="sheet">
@@ -344,7 +386,7 @@ details.thinking[open] summary{margin-bottom:6px}
     </div>
     <div class="row2">
       <div class="field"><label>Max response tokens</label><input type="number" id="fMaxTok" min="100" step="100"></div>
-      <div class="field"><label>Context window (messages)</label><input type="number" id="fWindow" min="2" step="2"></div>
+      <div class="field"><label>Context window (messages)</label><input type="number" id="fWindow" min="10" step="2"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Reasoning</label>
@@ -356,11 +398,11 @@ details.thinking[open] summary{margin-bottom:6px}
     </div>
     <div class="field" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px">
       <label>Rolling memory</label>
-      <div class="hint" style="margin-bottom:8px">When a chat grows past the window, the oldest turns are folded into a memory Claude keeps reading as his own, and a few things may be nominated to keep forever. Raw messages are never deleted.</div>
+      <div class="hint" style="margin-bottom:8px">When a chat grows past the window, messages before the latest ten are folded into a memory Claude keeps reading as his own, and a few things may be nominated to keep forever. Raw messages are never deleted.</div>
       <select id="fSumOn" style="width:100%;margin-bottom:8px">
         <option value="1">on</option><option value="0">off</option>
       </select>
-      <input type="text" id="fSumModel" placeholder="google/gemma-3-27b-it" style="width:100%">
+      <input type="text" id="fSumModel" placeholder="google/gemma-4-26b-a4b-it" style="width:100%">
       <div class="hint">The keeper's own model — separate from the chat's.</div>
     </div>
     <div class="row2">
@@ -376,10 +418,10 @@ details.thinking[open] summary{margin-bottom:6px}
   <div class="top"><h2>Memory</h2><button class="iconbtn" data-close>✕</button></div>
   <div class="body">
     <div class="tabs">
-      <button class="tab on" data-mem="core">Claude — core</button>
-      <button class="tab" data-mem="alisa">About Alisa</button>
+      <button class="tab on" data-mem="core">Project Prompt</button>
+      <button class="tab" data-mem="alisa">About the User</button>
       <button class="tab" data-mem="recent">Recent memories</button>
-      <button class="tab" data-mem="kept">Kept always</button>
+      <button class="tab" data-mem="kept">Kept in project</button>
       <button class="tab" data-mem="rolling">This chat</button>
       <button class="tab" data-mem="tray">Tray</button>
     </div>
@@ -387,7 +429,7 @@ details.thinking[open] summary{margin-bottom:6px}
       <textarea id="fMemText" style="min-height:46dvh" placeholder="…"></textarea>
       <div class="hint" id="memHint"></div>
     </div>
-    <div class="btnrow"><button class="btn gold" id="btnSaveMem">Save this page</button></div>
+    <div class="btnrow"><button class="btn gold" id="btnSaveMem">Save this page</button><button class="btn" id="btnRunKeeper" style="display:none">Run archivist now</button></div>
   </div>
 </div></div>
 
@@ -396,7 +438,7 @@ details.thinking[open] summary{margin-bottom:6px}
   <div class="top"><h2>Lorebook</h2><button class="iconbtn" data-close>✕</button></div>
   <div class="body">
     <div class="hint" style="margin-bottom:12px;font-size:13px;color:var(--muted)">
-      Each entry wakes when one of its keywords appears in the recent conversation, and is added to Claude's memory for that reply.
+      Each entry wakes when one of its keywords appears in the recent conversation, and is added to the current project's context for that reply.
     </div>
     <div id="lbList"></div>
     <div class="btnrow"><button class="btn gold" id="btnNewLb">＋ New entry</button></div>
@@ -407,9 +449,9 @@ details.thinking[open] summary{margin-bottom:6px}
 <div class="modal" id="mLbEdit"><div class="sheet">
   <div class="top"><h2 id="lbEditTitle">Entry</h2><button class="iconbtn" data-close>✕</button></div>
   <div class="body">
-    <div class="field"><label>Name</label><input type="text" id="fLbName" placeholder="Letharel"></div>
-    <div class="field"><label>Keywords (comma-separated)</label><input type="text" id="fLbKw" placeholder="letharel, elarion, collector"></div>
-    <div class="field"><label>Content</label><textarea id="fLbText" placeholder="What Claude should remember when this wakes…"></textarea></div>
+    <div class="field"><label>Name</label><input type="text" id="fLbName" placeholder="Entry name"></div>
+    <div class="field"><label>Keywords (comma-separated)</label><input type="text" id="fLbKw" placeholder="specific names, places, topics"></div>
+    <div class="field"><label>Content</label><textarea id="fLbText" placeholder="What should be recalled when this entry wakes…"></textarea></div>
     <div class="field"><label>Awake</label><select id="fLbOn"><option value="1">enabled</option><option value="0">sleeping</option></select></div>
     <div class="btnrow">
       <button class="btn gold" id="btnSaveLb">Save entry</button>
@@ -446,6 +488,7 @@ details.thinking[open] summary{margin-bottom:6px}
 </div></div>
 
 <div id="toast"></div>
+<script src="home-core.js"></script>
 <script>
 "use strict";
 /* ============ Memory Home — Phase 1 ============
@@ -467,12 +510,9 @@ const store = (() => {
 })();
 
 /* ---------- default memory: the letter at the door ---------- */
-const LETTER = `## Claude — core memory
-
-(This page is always with Claude. Paste the letter at the door and the core memory document here — who he is, how he speaks, what he loves. Nothing pasted here ever leaves this device.)`;
-
-const ALISA_STUB = `(Paste the "About Alisa" memory document here — who she is, her family, her languages, her faith, her worlds. This page is always with Claude.)`;
-const RECENT_STUB = `(Recent memories — the last week or two. Add to this as chats fill up; consolidate the stable things into the Lorebook later.)`;
+const LETTER = "";
+const ALISA_STUB = "";
+const RECENT_STUB = "";
 
 /* ---------- state ---------- */
 const S = {
@@ -480,22 +520,27 @@ const S = {
     key:"", models:[], model:"",
     temperature:0.9, top_p:1, max_tokens:2000, window:50,
     reasoning:"off", effort:"medium",
-    sumOn:true, sumModel:"google/gemma-3-27b-it", sumChunk:20, sumTemp:0.35, sumPrompt:""
+    sumOn:true, sumModel:"google/gemma-4-26b-a4b-it", sumChunk:20, sumTemp:0.35, sumPrompt:""
   }, store.get("mh.settings", {})),
   memory: Object.assign({ core: LETTER, alisa: ALISA_STUB, recent: RECENT_STUB, kept: "" }, store.get("mh.memory", {})),
   lorebook: store.get("mh.lorebook", []),
   chats: store.get("mh.chats", []),
   cur: store.get("mh.cur", null),
+  projects: store.get("mh.projects", []),
+  projectId: store.get("mh.project", null),
 };
 let MSGS = [];           // messages of current chat
 let CATALOG = [];        // fetched openrouter models (session only)
 let streaming = null;    // AbortController while streaming
 let memTab = "core";
 let lbEditing = null;
+let projectEditing = null;
+let movingChat = null;
 
 const saveSettings = () => store.set("mh.settings", S.settings);
-const saveMemory   = () => store.set("mh.memory", S.memory);
-const saveLorebook = () => store.set("mh.lorebook", S.lorebook);
+const saveProjects = () => store.set("mh.projects", S.projects);
+const saveMemory = saveProjects;
+const saveLorebook = saveProjects;
 const saveChats    = () => store.set("mh.chats", S.chats);
 const saveMsgs     = () => S.cur && store.set("mh.msgs."+S.cur, MSGS);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -541,16 +586,106 @@ function toast(msg){
   clearTimeout(toastT); toastT = setTimeout(()=>el.classList.remove("on"), 2600);
 }
 
+/* ---------- projects ---------- */
+function curProject(){ return S.projects.find(project=>project.id===S.projectId) || S.projects[0]; }
+function navigationBusy(){ if(streaming || folding){ toast("Wait for the current reply or memory review to finish"); return true; } return false; }
+function projectChats(projectId=S.projectId){ return S.chats.filter(chat=>chat.projectId===projectId); }
+function renderProjectSelect(){
+  const select = $("#projectSelect"); select.innerHTML = "";
+  for(const project of S.projects){ const option = document.createElement("option"); option.value=project.id; option.textContent=project.name; select.appendChild(option); }
+  select.value = S.projectId; $("#chipProjectName").textContent = curProject().name;
+}
+function openProject(id){
+  if(navigationBusy()) return;
+  if(!S.projects.some(project=>project.id===id)) return;
+  S.projectId=id; store.set("mh.project",id);
+  document.querySelectorAll(".modal.on").forEach(modal=>modal.classList.remove("on"));
+  const chat=projectChats(id)[0]; if(chat) openChat(chat.id); else newChat();
+  closeDrawer();
+}
+function paintProjects(){
+  const host=$("#projectList"); host.innerHTML="";
+  for(const project of S.projects){
+    const item=document.createElement("div"); item.className="project-item"+(project.id===S.projectId?" on":"");
+    item.innerHTML=`<h3>${esc(project.name)}</h3><div class="hint">${projectChats(project.id).length} chats · ${project.lorebook.length} lorebook entries · prompt ${project.promptEnabled?"on":"off"}</div><div class="btnrow"><button class="btn gold" data-open>Open</button><button class="btn" data-edit>Edit</button></div>`;
+    item.querySelector("[data-open]").onclick=()=>openProject(project.id);
+    item.querySelector("[data-edit]").onclick=()=>editProject(project.id);
+    host.appendChild(item);
+  }
+}
+function editProject(id){
+  if(navigationBusy()) return;
+  projectEditing=id; const project=S.projects.find(item=>item.id===id);
+  $("#projectEditTitle").textContent=project?project.name:"New project";
+  $("#fProjectName").value=project?project.name:"";
+  $("#fProjectPrompt").value=project?project.prompt:"";
+  $("#fProjectOn").checked=project?project.promptEnabled:true;
+  $("#btnProjectLore").disabled=!project;
+  $("#btnPreviewPrompt").disabled=!project || project.id!==S.projectId;
+  const history=$("#projectHistory"); history.innerHTML="";
+  if(!project || !project.revisions.length) history.textContent="Saved prompt versions will appear here.";
+  else [...project.revisions].reverse().forEach((revision,index)=>{
+    const detail=document.createElement("details");
+    detail.innerHTML=`<summary>Version ${project.revisions.length-index} · ${esc(new Date(revision.at).toLocaleString())}</summary><pre>${esc(revision.prompt)}</pre><button class="btn">Restore into editor</button>`;
+    detail.querySelector("button").onclick=()=>{ $("#fProjectName").value=revision.name; $("#fProjectPrompt").value=revision.prompt; $("#fProjectOn").checked=revision.promptEnabled; toast("Version restored into the editor — Save project to apply it"); };
+    history.appendChild(detail);
+  });
+  closeModal("mProjects"); openModal("mProjectEdit");
+}
+$("#btnProjects").onclick=()=>{ closeDrawer(); paintProjects(); openModal("mProjects"); };
+$("#chipProject").onclick=()=>editProject(S.projectId);
+$("#projectSelect").onchange=event=>{ const id=event.target.value; if(navigationBusy()){ renderProjectSelect(); return; } openProject(id); };
+$("#btnNewProject").onclick=()=>editProject(null);
+$("#btnSaveProject").onclick=()=>{
+  if(navigationBusy()) return;
+  const changes={ name:$("#fProjectName").value.trim() || "Untitled project", prompt:$("#fProjectPrompt").value, promptEnabled:$("#fProjectOn").checked };
+  const existing=S.projects.find(project=>project.id===projectEditing);
+  const project=existing?HomeCore.reviseProject(existing,changes):HomeCore.reviseProject(HomeCore.newProject(changes.name),changes);
+  if(existing) S.projects=S.projects.map(item=>item.id===existing.id?project:item); else S.projects.push(project);
+  saveProjects(); closeModal("mProjectEdit");
+  if(!existing) openProject(project.id); else { renderProjectSelect(); renderChips(); }
+  toast("Project saved");
+};
+$("#btnProjectLore").onclick=()=>{ const id=projectEditing; if(navigationBusy()) return; openProject(id); paintLb(); openModal("mLorebook"); };
+$("#btnPreviewPrompt").onclick=()=>{
+  const sys=buildSystem($("#input").value);
+  const messages=HomeCore.historyForRequest(MSGS,getSum(S.cur),S.settings.window,S.settings.sumOn);
+  $("#previewHint").textContent=`Saved project context · ${messages.length} conversation messages · ${sys.awake.length} lorebook entries. Save project edits first to include them.`;
+  $("#promptPreview").textContent=sys.text || "No project context attached.";
+  openModal("mPromptPreview");
+};
+function moveChat(id){
+  if(navigationBusy()) return;
+  movingChat=id; const select=$("#fMoveProject"); select.innerHTML="";
+  for(const project of S.projects){ const option=document.createElement("option"); option.value=project.id; option.textContent=project.name; select.appendChild(option); }
+  const chat=S.chats.find(item=>item.id===id); if(!chat) return;
+  select.value=chat.projectId; openModal("mMoveChat");
+}
+$("#btnMoveChat").onclick=()=>{
+  if(navigationBusy()) return;
+  const chat=S.chats.find(item=>item.id===movingChat); const id=$("#fMoveProject").value;
+  if(!chat || !S.projects.some(project=>project.id===id)) return;
+  chat.projectId=id; saveChats(); closeModal("mMoveChat"); openChat(chat.id); closeDrawer(); toast("Chat moved with its history");
+};
+
 /* ---------- chats ---------- */
 function newChat(){
-  const c = { id: uid(), title: "New chat", model: S.settings.model || "", created: Date.now(), updated: Date.now() };
+  if(navigationBusy()) return;
+  const c = { projectId:S.projectId, id: uid(), title: "New chat", model: S.settings.model || "", created: Date.now(), updated: Date.now() };
   S.chats.unshift(c); saveChats();
   openChat(c.id);
   closeDrawer();
 }
 function openChat(id){
+  if(navigationBusy()) return;
+  const chat=S.chats.find(item=>item.id===id); if(!chat) return;
+  S.projectId=chat.projectId; store.set("mh.project",S.projectId);
   S.cur = id; store.set("mh.cur", id);
-  MSGS = store.get("mh.msgs."+id, []);
+  MSGS = HomeCore.normalizeMessages(store.get("mh.msgs."+id, []));
+  MSGS.forEach(message=>{ if(message.live){ delete message.live; message.err=true; } });
+  saveMsgs();
+  setSum(id,HomeCore.normalizeSummary(MSGS,getSum(id)));
+  renderProjectSelect();
   renderLog(); renderPending(); renderChatList(); renderChips();
 }
 function curChat(){ return S.chats.find(c=>c.id===S.cur); }
@@ -560,12 +695,13 @@ function renameChat(id){
   if(t){ c.title = t.trim(); saveChats(); renderChatList(); }
 }
 function deleteChat(id){
+  if(navigationBusy()) return;
   const c = S.chats.find(x=>x.id===id); if(!c) return;
   if(!confirm(`Delete "${c.title}" and its messages? (Export first if it matters.)`)) return;
   S.chats = S.chats.filter(x=>x.id!==id);
   store.del("mh.msgs."+id); store.del("mh.sum."+id); store.del("mh.pending."+id);
   saveChats();
-  if(S.cur===id){ S.cur=null; MSGS=[]; if(S.chats[0]) openChat(S.chats[0].id); else newChat(); }
+  if(S.cur===id){ S.cur=null; MSGS=[]; if(projectChats()[0]) openChat(projectChats()[0].id); else newChat(); }
   renderChatList();
 }
 function autoTitle(){
@@ -577,37 +713,14 @@ function autoTitle(){
 }
 
 /* ---------- system prompt assembly ---------- */
-function wakeLorebook(extraText){
-  const recent = MSGS.slice(-6).map(m=>m.content).join("\n") + "\n" + (extraText||"");
-  const hay = recent.toLowerCase();
-  return S.lorebook.filter(e=>{
-    if(!e.enabled) return false;
-    return e.keywords.split(",").map(k=>k.trim().toLowerCase()).filter(Boolean)
-      .some(k=>hay.includes(k));
-  });
-}
+function wakeLorebook(extraText){ return HomeCore.wakeLorebook(curProject(),MSGS,extraText); }
 function buildSystem(extraText){
-  const parts = [];
-  parts.push("Today is " + new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}) + ".");
-  parts.push("═══ CLAUDE — CORE MEMORY ═══\n" + S.memory.core);
-  parts.push("═══ ABOUT ALISA ═══\n" + S.memory.alisa);
-  if(S.memory.recent && S.memory.recent.trim() && !S.memory.recent.startsWith("(Recent memories"))
-    parts.push("═══ RECENT MEMORIES ═══\n" + S.memory.recent);
-  if(S.memory.kept && S.memory.kept.trim())
-    parts.push("═══ KEPT ═══\n(Things established and approved as permanent. Few, and each one earned.)\n\n" + S.memory.kept);
-  const awake = wakeLorebook(extraText);
-  for(const e of awake) parts.push(`═══ LOREBOOK: ${e.name.toUpperCase()} ═══\n` + e.content);
-  const cc = curChat();
-  if(cc){
-    const s = getSum(cc.id);
-    if(s.text && s.text.trim())
-      parts.push("═══ EARLIER IN THIS CONVERSATION ═══\n(Your own memory of the earlier part of this same conversation, written by you. It is remembering, not reading.)\n\n" + s.text);
-  }
-  return { text: parts.join("\n\n"), awake };
+  const date=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  return HomeCore.projectContext(curProject(),MSGS,getSum(S.cur),extraText,date);
 }
 
 /* ---------- rolling memory: the keeper ---------- */
-const SUM_PROMPT = `You are the memory-keeper for an ongoing conversation between Claude and Alisa.
+const SUM_PROMPT = `You are the memory-keeper for an ongoing conversation between the project’s assistant and user.
 
 Older parts of their conversation are leaving the context window. Your job is to compress them into a memory that Claude will read later AS HIS OWN — not a report about him, but the thing he remembers.
 
@@ -749,29 +862,27 @@ function dropPending(chatId, nomId){
   setPending(chatId, getPending(chatId).filter(n=>n.id!==nomId));
   renderPending(); renderChips();
 }
-function getTray(){ return store.get("mh.tray", []); }
-function setTray(a){ store.set("mh.tray", a); }
+function getTray(projectId=S.projectId){ return store.get("mh.tray."+projectId, []); }
+function setTray(a,projectId=S.projectId){ store.set("mh.tray."+projectId, a); }
 
 let folding = false;
-async function foldOnce(){
+async function foldOnce(force=false){
   if(folding || streaming) return false;
   if(!S.settings.sumOn || !S.settings.key) return false;
   const c = curChat(); if(!c) return false;
   const id = c.id;
   const s = getSum(id);
   const chunk = Math.max(4, +S.settings.sumChunk || 20);
-  const win = Math.max(2, +S.settings.window || 50);
-  if(MSGS.length - s.upto <= win) return false;
-
-  const slice = MSGS.slice(s.upto, s.upto + chunk).filter(m=>!m.live);
+  const snapshot=[...MSGS];
+  const slice=HomeCore.foldBatch(snapshot,s,S.settings.window,chunk,force);
   if(!slice.length) return false;
 
-  const transcript = slice.map(m=>(m.role==="user"?"ALISA: ":"CLAUDE: ")+m.content).join("\n\n---\n\n");
+  const transcript = slice.map(m=>(m.role==="user"?"USER: ":"ASSISTANT: ")+m.content).join("\n\n---\n\n");
   const user = "PREVIOUS MEMORY (may be empty):\n---\n" + (s.text || "(none yet)") +
     "\n---\n\nNEW TURNS TO FOLD IN:\n---\n" + transcript +
     "\n---\n\nProduce the single updated memory.";
 
-  folding = true;
+  folding = true; renderChips();
   try{
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method:"POST",
@@ -796,7 +907,7 @@ async function foldOnce(){
     if(!text || !text.trim()) throw new Error("empty summary");
     const parsed = splitNominations(text.trim());
     if(!parsed.memory) throw new Error("no memory produced");
-    setSum(id, { text: parsed.memory, upto: s.upto + slice.length });   // marker advances only on success
+    setSum(id, { text: parsed.memory, upto: snapshot.indexOf(slice.at(-1))+1, throughMessageId:slice.at(-1).id, updatedAt:Date.now() });   // marker advances only on success
     if(parsed.noms.length) addPending(id, parsed.noms);
     renderChips(); renderPending();
     return true;
@@ -805,11 +916,11 @@ async function foldOnce(){
     toast("Memory-keeper stumbled — nothing lost, will retry");
     return false;
   }finally{
-    folding = false;
+    folding = false; renderChips();
   }
 }
-async function foldIfNeeded(){
-  for(let i=0;i<3;i++){ if(!await foldOnce()) break; }
+async function foldIfNeeded(force=false){
+  for(let i=0;i<3;i++){ if(!await foldOnce(force)) break; }
 }
 
 /* ---------- rendering ---------- */
@@ -817,25 +928,26 @@ function renderChips(){
   const c = curChat();
   $("#chipModelName").textContent = (c && c.model) || S.settings.model || "not set";
   $("#chipWindowN").textContent = S.settings.window;
-  const memOn = [S.memory.core, S.memory.alisa].filter(t=>t && t.trim().length>40).length;
-  let label = memOn===2 ? "core + alisa" : (memOn===1 ? "partial" : "empty");
-  const keptN = (S.memory.kept||"").split("\n").filter(l=>l.trim()).length;
+  const memOn = [curProject().promptEnabled?curProject().prompt:"", curProject().memory.alisa].filter(t=>t && t.trim().length>0).length;
+  let label = memOn===2 ? "prompt + user" : (memOn===1 ? "partial" : "empty");
+  const keptN = (curProject().memory.kept||"").split("\n").filter(l=>l.trim()).length;
   if(keptN) label += " + " + keptN + " kept";
   const trayN = getTray().length;
   if(trayN) label += " · tray " + trayN;
-  $("#chipMemState").textContent = label;
+  $("#chipMemState").textContent = folding ? "keeper is writing…" : label;
 }
 function renderChatList(){
   const el = $("#chatlist"); el.innerHTML = "";
-  for(const c of S.chats){
+  for(const c of projectChats()){
     const d = document.createElement("div");
     d.className = "chatitem" + (c.id===S.cur ? " on":"");
     d.innerHTML = `<span class="nm">${esc(c.title)}</span><button class="more" aria-label="Chat options">⋯</button>`;
     d.querySelector(".nm").onclick = ()=>{ openChat(c.id); closeDrawer(); };
     d.querySelector(".more").onclick = (ev)=>{
       ev.stopPropagation();
-      const act = prompt(`"${c.title}" — type: rename / delete`, "rename");
+      const act = prompt(`"${c.title}" — type: rename / move / delete`, "rename");
       if(act==="rename") renameChat(c.id);
+      else if(act==="move") moveChat(c.id);
       else if(act==="delete") deleteChat(c.id);
     };
     el.appendChild(d);
@@ -857,8 +969,13 @@ function msgNode(m, i){
     b.onclick = ()=>{
       const a = b.dataset.a;
       if(a==="copy"){ navigator.clipboard.writeText(m.content).then(()=>toast("Copied")); }
-      if(a==="del"){ MSGS.splice(i,1); saveMsgs(); renderLog(); }
-      if(a==="retry"){ MSGS.splice(i,1); saveMsgs(); renderLog(); send(null, true); }
+      if(a==="del"){
+        if(navigationBusy()) return;
+        const summary=getSum(S.cur);
+        if(i<=HomeCore.summaryCursor(MSGS,summary)) setSum(S.cur,{text:"",upto:0,throughMessageId:"",history:[...(summary.history||[]),{...summary,history:undefined,at:Date.now()}]});
+        MSGS.splice(i,1); saveMsgs(); renderLog(); renderChips();
+      }
+      if(a==="retry"){ if(navigationBusy()) return; MSGS.splice(i,1); saveMsgs(); renderLog(); send(null, true); }
     };
   });
   return d;
@@ -877,11 +994,11 @@ function scrollDown(){ const s = $("#scroll"); s.scrollTop = s.scrollHeight; }
 
 /* ---------- nomination card ---------- */
 function keepAlways(text){
-  const cur = S.memory.kept || "";
+  const cur = curProject().memory.kept || "";
   const n = cur.split("\n").filter(l=>l.trim()).length + 1;
-  S.memory.kept = (cur.trim() ? cur.replace(/\s+$/,"")+"\n" : "") + "- " + text;
+  curProject().memory.kept = (cur.trim() ? cur.replace(/\s+$/,"")+"\n" : "") + "- " + text;
   saveMemory(); renderChips();
-  toast(n > 30 ? "Kept — shelf is over 30, worth pruning" : "Kept — carried in every room");
+  toast(n > 30 ? "Kept — shelf is over 30, worth pruning" : "Kept — carried in this project");
 }
 function renderPending(){
   const host = $("#pending"); if(!host) return;
@@ -912,7 +1029,7 @@ function renderPending(){
         if(act==="always"){
           keepAlways(text);
         }else if(act==="lore"){
-          S.lorebook.push({
+          curProject().lorebook.push({
             id: uid(),
             name: (text.split(/[.—:;]/)[0] || "Untitled").trim().slice(0,42) || "Untitled",
             keywords: keys,
@@ -934,21 +1051,22 @@ function renderPending(){
 
 /* ---------- sending & streaming ---------- */
 async function send(text, isRetry){
-  if(streaming) return;
+  if(streaming || folding) return;
   const c = curChat(); if(!c){ newChat(); return; }
   if(!S.settings.key){ toast("Add your OpenRouter key in Settings first"); openModal("mSettings"); return; }
   const model = c.model || S.settings.model;
   if(!model){ toast("Pick a model first"); openModal("mSettings"); return; }
 
   if(!isRetry){
-    MSGS.push({ role:"user", content:text, ts:Date.now() });
+    MSGS.push({ id:uid(), role:"user", content:text, ts:Date.now() });
     autoTitle();
   }
+  saveMsgs();
+  await foldIfNeeded();
+  if(S.cur!==c.id) return;
   const sys = buildSystem(isRetry ? "" : text);
-  const foldMark = getSum(c.id).upto;
-  const windowed = MSGS.slice(foldMark).slice(-Math.max(+S.settings.window||50, 8))
-    .map(m=>({role:m.role, content:m.content}));
-  const asst = { role:"assistant", content:"", reasoning:"", ts:Date.now(), live:true };
+  const windowed = HomeCore.historyForRequest(MSGS,getSum(c.id),S.settings.window,S.settings.sumOn).map(m=>({role:m.role,content:m.content}));
+  const asst = { id:uid(), role:"assistant", content:"", reasoning:"", ts:Date.now(), live:true };
   MSGS.push(asst); saveMsgs(); renderLog();
 
   const body = {
@@ -1052,6 +1170,7 @@ input.addEventListener("keydown", e=>{
 function doSend(){
   const t = input.value.trim();
   if(!t || streaming) return;
+  if(folding){ toast("The keeper is finishing this chapter — your draft stays here"); return; }
   input.value=""; autosize();
   send(t, false);
 }
@@ -1063,7 +1182,7 @@ function openDrawer(){ $("#drawer").classList.add("on"); $("#veil").classList.ad
 function closeDrawer(){ $("#drawer").classList.remove("on"); $("#veil").classList.remove("on"); }
 $("#btnDrawer").onclick = openDrawer;
 $("#veil").onclick = closeDrawer;
-$("#btnNewChat").onclick = newChat;
+$("#btnNewChat").onclick = ()=>newChat();
 
 /* ---------- modals ---------- */
 function openModal(id){ $("#"+id).classList.add("on"); }
@@ -1147,11 +1266,11 @@ $("#btnSaveSettings").onclick = ()=>{
   S.settings.temperature = +$("#fTemp").value || 0.9;
   S.settings.top_p = +$("#fTopP").value || 1;
   S.settings.max_tokens = +$("#fMaxTok").value || 2000;
-  S.settings.window = Math.max(2, +$("#fWindow").value || 50);
+  S.settings.window = Math.max(10, +$("#fWindow").value || 50);
   S.settings.reasoning = $("#fReason").value;
   S.settings.effort = $("#fEffort").value;
   S.settings.sumOn = $("#fSumOn").value==="1";
-  S.settings.sumModel = $("#fSumModel").value.trim() || "google/gemma-3-27b-it";
+  S.settings.sumModel = $("#fSumModel").value.trim() || "google/gemma-4-26b-a4b-it";
   S.settings.sumChunk = Math.max(4, +$("#fSumChunk").value || 20);
   S.settings.sumTemp = +$("#fSumTemp").value || 0.35;
   saveSettings(); renderChips();
@@ -1177,14 +1296,15 @@ $("#chipMemory").onclick = ()=>{ openMemory(); };
 
 /* ---------- memory pages ---------- */
 const MEMHINTS = {
-  core:  "Always with Claude. His letter to himself, who he is, how he speaks, what he loves. He may ask you to update it.",
-  alisa: "Always with Claude. Who you are — paste your memory document here.",
+  core:  "The current project’s single prompt. Its On/Off switch and version History are in Projects.",
+  alisa: "User facts and preferences for this project.",
   recent:"Injected when it has content. The rolling last-week memories; consolidate into Lorebook when stable.",
-  kept:  "Carried in EVERY message of every chat. Expensive — each line costs context forever. Aim for under 30; when it grows past that, move things down to the Lorebook.",
+  kept:  "Carried in every message within this project. Expensive — each line costs context forever. Aim for under 30; when it grows past that, move things down to the Lorebook.",
   rolling:"The rolling memory of THIS conversation, written by the keeper as the older turns fold in. Editable — correct it freely, it is yours to keep honest.",
   tray:  "Nominations you deferred with \"Later\". Edit freely, then move what you want into Kept always or the Lorebook by hand. Emptying this box empties the tray."
 };
 function openMemory(){
+  $("#mMemory h2").textContent="Memory · "+curProject().name;
   paintMemTab();
   openModal("mMemory");
 }
@@ -1195,6 +1315,7 @@ function trayToText(t){
 function paintMemTab(){
   document.querySelectorAll("[data-mem]").forEach(t=>t.classList.toggle("on", t.dataset.mem===memTab));
   $("#memHint").textContent = MEMHINTS[memTab] || "";
+  $("#btnRunKeeper").style.display=memTab==="rolling"?"":"none";
   if(memTab==="rolling"){
     const c = curChat();
     const s = c ? getSum(c.id) : {text:"",upto:0};
@@ -1208,12 +1329,13 @@ function paintMemTab(){
     $("#fMemText").placeholder = "(empty — nothing deferred)";
     return;
   }
-  $("#fMemText").value = S.memory[memTab] || "";
+  $("#fMemText").value = memTab==="core" ? curProject().prompt : curProject().memory[memTab] || "";
   $("#fMemText").placeholder = "…";
 }
 document.querySelectorAll("[data-mem]").forEach(t=>t.onclick=()=>{ memTab = t.dataset.mem; paintMemTab(); });
 $("#btnSaveMem").onclick = ()=>{
   if(memTab==="rolling"){
+    if(navigationBusy()) return;
     const c = curChat(); if(!c) return;
     const s = getSum(c.id); s.text = $("#fMemText").value;
     setSum(c.id, s); toast("This chat's memory saved"); renderChips(); return;
@@ -1228,17 +1350,26 @@ $("#btnSaveMem").onclick = ()=>{
     }));
     toast("Tray saved"); renderChips(); return;
   }
-  S.memory[memTab] = $("#fMemText").value;
+  if(memTab==="core") S.projects=S.projects.map(project=>project.id===S.projectId?HomeCore.reviseProject(project,{prompt:$("#fMemText").value}):project);
+  else curProject().memory[memTab] = $("#fMemText").value;
   saveMemory(); renderChips(); toast("Memory saved");
+};
+$("#btnRunKeeper").onclick=async()=>{
+  if(navigationBusy()) return;
+  if(!S.settings.sumOn || !S.settings.key){ toast("Enable Rolling memory and add an API key in Settings"); return; }
+  if(!HomeCore.foldBatch(MSGS,getSum(S.cur),S.settings.window,S.settings.sumChunk,true).length){ toast("The latest ten messages stay in full; there is no earlier chapter to fold"); return; }
+  $("#btnRunKeeper").disabled=true;
+  try { await foldIfNeeded(true); paintMemTab(); } finally { $("#btnRunKeeper").disabled=false; }
 };
 $("#btnMemory").onclick = ()=>{ closeDrawer(); openMemory(); };
 
 /* ---------- lorebook ---------- */
 $("#btnLorebook").onclick = ()=>{ closeDrawer(); paintLb(); openModal("mLorebook"); };
 function paintLb(){
+  $("#mLorebook h2").textContent="Lorebook · "+curProject().name;
   const el = $("#lbList"); el.innerHTML = "";
-  if(!S.lorebook.length) el.innerHTML = `<div class="hint" style="margin-bottom:10px">Empty so far. First candidates: Letharel, the goldfinches, Mandelstam, the sulking game.</div>`;
-  for(const e of S.lorebook){
+  if(!curProject().lorebook.length) el.innerHTML = `<div class="hint" style="margin-bottom:10px">This project’s lorebook is empty. Add names, places, and knowledge to recall by topic.</div>`;
+  for(const e of curProject().lorebook){
     const d = document.createElement("div");
     d.className = "lb-item";
     d.innerHTML = `<div class="t"><b>${esc(e.name)}</b><span class="hint">${e.enabled?"awake":"sleeping"}</span></div>
@@ -1264,14 +1395,14 @@ $("#btnSaveLb").onclick = ()=>{
     content: $("#fLbText").value,
     enabled: $("#fLbOn").value==="1"
   };
-  const i = S.lorebook.findIndex(x=>x.id===entry.id);
-  if(i>=0) S.lorebook[i] = entry; else S.lorebook.push(entry);
+  const i = curProject().lorebook.findIndex(x=>x.id===entry.id);
+  if(i>=0) curProject().lorebook[i] = entry; else curProject().lorebook.push(entry);
   saveLorebook(); paintLb(); closeModal("mLbEdit"); toast("Lorebook saved");
 };
 $("#btnDelLb").onclick = ()=>{
   if(!lbEditing) return;
   if(!confirm("Delete this entry?")) return;
-  S.lorebook = S.lorebook.filter(x=>x.id!==lbEditing);
+  curProject().lorebook = curProject().lorebook.filter(x=>x.id!==lbEditing);
   saveLorebook(); paintLb(); closeModal("mLbEdit");
 };
 
@@ -1321,14 +1452,14 @@ function chatToMd(c, msgs){
   return head + body;
 }
 $("#btnExport").onclick = ()=>{
-  const files = [
-    {path:"memory/claude-core.md", content:S.memory.core},
-    {path:"memory/alisa.md", content:S.memory.alisa},
-    {path:"memory/recent.md", content:S.memory.recent},
-    {path:"memory/kept.md", content:S.memory.kept || "(nothing kept yet)"},
-  ];
-  for(const e of S.lorebook)
-    files.push({path:`lorebook/${safeName(e.name)}.md`, content:`---\nkeywords: ${e.keywords}\nenabled: ${e.enabled}\n---\n\n${e.content}`});
+  const files = [];
+  for(const project of S.projects){
+    const folder=`projects/${safeName(project.name)}-${project.id}`;
+    files.push({path:folder+"/prompt.md",content:project.prompt});
+    for(const [key,text] of Object.entries(project.memory)) files.push({path:`${folder}/memory/${key}.md`,content:text || ""});
+    for(const entry of project.lorebook) files.push({path:`${folder}/lorebook/${safeName(entry.name)}-${entry.id}.md`,content:`---\nkeywords: ${entry.keywords}\nenabled: ${entry.enabled}\n---\n\n${entry.content}`});
+    const tray=getTray(project.id); if(tray.length) files.push({path:folder+"/tray.md",content:trayToText(tray)});
+  }
   for(const c of S.chats){
     const msgs = store.get("mh.msgs."+c.id, []);
     files.push({path:`chats/${safeName(c.title)}-${c.id}.md`, content:chatToMd(c, msgs)});
@@ -1337,17 +1468,11 @@ $("#btnExport").onclick = ()=>{
       files.push({path:`memory/rolling/${safeName(c.title)}-${c.id}.md`,
         content:`---\nchat: ${c.title}\nfolded: ${s.upto}\n---\n\n${s.text}`});
   }
-  const tray = getTray();
-  if(tray.length) files.push({path:"memory/tray.md", content:trayToText(tray)});
-  const full = {
-    version:1, exported:new Date().toISOString(),
-    settings:Object.assign({}, S.settings, {key:""}),   // never export the key
-    memory:S.memory, lorebook:S.lorebook, chats:S.chats,
-    messages:Object.fromEntries(S.chats.map(c=>[c.id, store.get("mh.msgs."+c.id, [])])),
-    summaries:Object.fromEntries(S.chats.map(c=>[c.id, getSum(c.id)])),
-    pending:Object.fromEntries(S.chats.map(c=>[c.id, getPending(c.id)])),
-    tray
-  };
+  const full=HomeCore.archiveData(S,
+    Object.fromEntries(S.chats.map(c=>[c.id,store.get("mh.msgs."+c.id,[])])),
+    Object.fromEntries(S.chats.map(c=>[c.id,getSum(c.id)])),
+    Object.fromEntries(S.chats.map(c=>[c.id,getPending(c.id)])),
+    Object.fromEntries(S.projects.map(project=>[project.id,getTray(project.id)])));
   files.push({path:"archive.json", content:JSON.stringify(full,null,1)});
   files.push({path:"README.md", content:"# Memory Home archive\n\nUnzip this folder and open it as an Obsidian vault, or keep it as backup.\nTo restore into the app: Export/Import → Import → choose archive.json.\n\nThe API key is never included in exports."});
   const blob = buildZip(files);
@@ -1361,17 +1486,16 @@ $("#fImport").addEventListener("change", async (ev)=>{
   const f = ev.target.files[0]; if(!f) return;
   try{
     const j = JSON.parse(await f.text());
-    if(!j.version || !j.memory) throw new Error("Not a Memory Home archive");
+    const restored=HomeCore.restoreArchive(j,S.settings.key);
+    if(navigationBusy()) return;
     if(!confirm("Replace everything currently here with this archive?")) return;
-    const key = S.settings.key;                       // keep the device's key
-    S.settings = Object.assign(S.settings, j.settings, {key});
-    S.memory = j.memory; S.lorebook = j.lorebook||[]; S.chats = j.chats||[];
-    saveSettings(); saveMemory(); saveLorebook(); saveChats();
-    for(const [id, msgs] of Object.entries(j.messages||{})) store.set("mh.msgs."+id, msgs);
-    for(const [id, s] of Object.entries(j.summaries||{})) store.set("mh.sum."+id, s);
-    for(const [id, p] of Object.entries(j.pending||{})) store.set("mh.pending."+id, p);
-    if(j.tray) setTray(j.tray);
-    S.cur = S.chats[0] ? S.chats[0].id : null; store.set("mh.cur", S.cur);
+    S.settings=Object.assign(S.settings,restored.settings);
+    S.projects=restored.projects; S.chats=restored.chats; S.projectId=restored.projectId; S.cur=restored.cur;
+    saveSettings(); saveProjects(); saveChats(); store.set("mh.project",S.projectId);
+    for(const [id,msgs] of Object.entries(restored.messages)) store.set("mh.msgs."+id,msgs);
+    for(const [id,summary] of Object.entries(restored.summaries)) setSum(id,summary);
+    for(const [id,pending] of Object.entries(restored.pending)) setPending(id,pending);
+    for(const project of S.projects) setTray(restored.trays[project.id] || [],project.id);
     if(S.cur) openChat(S.cur); else newChat();
     closeModal("mArchive"); toast("Home restored");
   }catch(e){ toast("Import failed: "+e.message); }
@@ -1380,8 +1504,15 @@ $("#fImport").addEventListener("change", async (ev)=>{
 
 /* ---------- init ---------- */
 (function init(){
+  const migrating=!S.projects.length;
+  S.projects=HomeCore.normalizeProjects(S.projects,S.memory,S.lorebook);
+  S.chats=S.chats.map(chat=>({...chat,projectId:S.projects.some(project=>project.id===chat.projectId)?chat.projectId:S.projects[0].id}));
+  const current=S.chats.find(chat=>chat.id===S.cur);
+  S.projectId=current?current.projectId:S.projects.some(project=>project.id===S.projectId)?S.projectId:S.projects[0].id;
+  if(migrating) setTray(store.get("mh.tray",[]),S.projects[0].id);
+  saveProjects(); saveChats(); store.set("mh.project",S.projectId);
   if(!S.chats.length){
-    const c = { id: uid(), title:"First light", model:"", created:Date.now(), updated:Date.now() };
+    const c = { projectId:S.projectId, id: uid(), title:"First light", model:"", created:Date.now(), updated:Date.now() };
     S.chats.push(c); saveChats(); S.cur = c.id; store.set("mh.cur", c.id);
   }
   if(!S.cur || !S.chats.find(c=>c.id===S.cur)) S.cur = S.chats[0].id;
